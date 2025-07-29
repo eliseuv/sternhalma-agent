@@ -129,9 +129,9 @@ class Client:
                     logging.error(f"Received unexpected message: {message}")
                     continue
 
-        # Make first move if player is Nought
-        if self.agent.player == Player.Nought:
-            logging.debug("Making the first move as Nought...")
+        # Make first move if player is Cross
+        if self.agent.player == Player.Cross:
+            logging.debug("Making the first move...")
             chosen_opening = self.agent.decide_opening()
             logging.info(f"Chosen opening move: {chosen_opening}")
 
