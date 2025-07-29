@@ -1,216 +1,260 @@
 import argparse
-import json
+from dataclasses import dataclass
 import logging
+from pprint import PrettyPrinter
 import socket
 import time
+from typing import final
 
-from tictactoe import Agent, Board, Player
+import cbor2
 
-CONN_RETRY_DELAY_SECS = 1
-MAX_CONN_ATTEMPTS = 10
-BUFFER_SIZE = 1024
+from tictactoe import Agent, Player
+
+# Custom pretty printer for better readability of logs
+printer = PrettyPrinter(indent=4, width=80, compact=True, sort_dicts=False)
 
 
+@final
 class Client:
-    def __init__(self, s: socket.socket):
-        self.s = s
-        self.agent = Agent(Player.Empty)
+    """Class to manage a client connection to a server.
 
-    def connect_to_server(self, addr: str, port: int):
-        """Connects client to the server.
+    Attributes:
+        addr (str): The server address to connect to.
+        port (int): The server port to connect to.
+        buf_size (int): Size of the buffer for receiving messages.
+        delay (float): Delay in seconds between connection attempts.
+        attempts (int): Number of connection attempts before giving up.
+        _socket (socket.socket | None): The socket instance for the connection.
+    """
+
+    def __init__(
+        self,
+        addr: str,
+        port: int,
+        delay: float = 1,
+        attempts: int = 10,
+        buf_size: int = 1024,
+    ):
+        """Initializes the Client with connection parameters.
 
         Args:
-            addr: Server address
-            port: Server port
+            addr (str): The server address to connect to.
+            port (int): The server port to connect to.
+            buf_size (int): Size of the buffer for receiving messages. Default is 1024 bytes.
+            delay (float): Delay in seconds between connection attempts. Default is 1 second.
+            attempts (int): Number of connection attempts before giving up. Default is 10.
+        """
+
+        # Socket connection parameters
+        self.addr = addr
+        self.port = port
+
+        # Connection retry parameters
+        self.delay = delay
+        self.attempts = attempts
+
+        # Buffer size for receiving messages
+        self.buf_size = buf_size
+
+        # Socket instance
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def __enter__(self):
+        """Establishes a socket connection to the server.
 
         Returns:
-            socket.socket: A connected socket to the server.
+            Client: The instance of the Client class with an established socket connection.
 
         Raises:
             ConnectionRefusedError: If the connection to the server fails after multiple attempts.
         """
 
-        # Attempt to connect to the server
-        logging.info(f"Connecting to server at {addr}:{port}...")
-        for connection_attempt in range(MAX_CONN_ATTEMPTS):
+        logging.info(f"Connecting to server at {self.addr}:{self.port}")
+        for attempt in range(self.attempts):
             try:
-                self.s.connect((addr, port))
-                logging.info("Successfully connected to the server.")
-                return
-            except ConnectionRefusedError:
+                self._socket.connect((self.addr, self.port))
                 logging.info(
-                    f"Connection refused. Attempt {connection_attempt + 1}/{MAX_CONN_ATTEMPTS}. Retrying in {CONN_RETRY_DELAY_SECS}s..."
+                    f"Successfully connected to server at {self.addr}:{self.port}"
                 )
-                time.sleep(CONN_RETRY_DELAY_SECS)
+                return self
+
+            # If the connection is refused, log the error, wait and retry
+            except ConnectionRefusedError:
+                logging.warning(
+                    f"Connection refused. Retrying... ({attempt + 1}/{self.attempts})"
+                )
+                time.sleep(self.delay)
                 continue
+
+            # If any other exception occurs, log it and close the socket if it was created
+            except Exception as e:
+                logging.critical(f"An error occurred while connecting: {e}")
+                # Close the socket if it was created
+                if self._socket:
+                    self._socket.close()
+                raise
+
+        # If all attempts fail, raise a ConnectionRefusedError
         else:
             raise ConnectionRefusedError(
-                f"Failed to connect to the server after {MAX_CONN_ATTEMPTS} attempts."
+                f"Failed to connect to the server after {self.attempts} attempts."
             )
 
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Closes the socket connection when exiting the context manager.
+
+        Args:
+            exc_type: The type of the exception raised, if any.
+            exc_value: The value of the exception raised, if any.
+            traceback: The traceback object, if any.
+        """
+        # Close the socket connection if it exists
+        if self._socket:
+            self._socket.close()
+            logging.debug("Socket connection closed.")
+
+        # Handle exceptions that occurred during the context
+        if exc_type:
+            logging.error(f"An error occurred: {exc_value}")
+
+        # Return False to propagate exceptions
+        return False
+
     def receive_message(self):
-        """Keeps receiving messages from the server until a valid JSON message is received.
+        """Attempts to receive a message from the server, retrying if necessary.
 
         Returns:
-            dict: The message received from the server.
+            dict: The message received from the server, decoded from CBOR format.
 
         Raises:
-            ConnectionResetError: If the connection to the server is lost.
+            ConnectionRefusedError: If the connection to the server fails after multiple attempts.
         """
-
-        while True:
+        logging.debug("Waiting for a message from the server...")
+        for attempt in range(self.attempts):
             try:
-                data = self.s.recv(BUFFER_SIZE)
+                data = self._socket.recv(self.buf_size)
             except ConnectionResetError:
-                logging.critical("Connection lost to the server.")
-                raise
-            if not data:
-                logging.critical("Connection closed by the server.")
-                raise ConnectionResetError("Connection closed by the server.")
-
-            try:
-                message = json.loads(data.decode("utf-8"))
-                logging.debug(f"Received message: {message}")
-                return message
-            except json.JSONDecodeError:
-                # TODO: Warn server about malformed data
                 logging.error(
-                    f"Received malformed data from the server:\n{data.decode('utf-8')}\nRetrying..."
+                    f"Connection error. Retrying... ({attempt + 1}/{self.attempts})"
                 )
                 continue
+            # Check if connection was closed by the server
+            if not data:
+                raise ConnectionResetError("Connection closed by the server.")
+            # Attempt to decode the received data
+            try:
+                message = cbor2.loads(data)
+            except cbor2.CBORDecodeError:
+                logging.error(
+                    f"Received malformed data from the server:\n{data}\nRetrying... ({attempt + 1}/{self.attempts})"
+                )
+                continue
+            # Message successfully received and decoded
+            logging.debug(f"Received message: {printer.pformat(message)}")
+            return message
+        else:
+            raise ConnectionRefusedError(
+                f"Failed to receive message from server after {self.attempts} attempts."
+            )
 
     def send_message(self, message):
         """Sends a message to the server.
 
         Args:
-            message: The message to send, as a dictionary.
+            message (dict): The message to send, as a serializable dictionary.
 
         Raises:
             TypeError: If the message is not a serializable dictionary.
             ConnectionResetError: If the connection to the server is lost while sending the message.
         """
 
+        logging.debug(f"Sending message:\n{message}")
+
+        # Serialize the message
         try:
-            self.s.sendall(json.dumps(message).encode("utf-8"))
-            logging.debug(f"Sent message: {message}")
+            data = cbor2.dumps(message)
         except TypeError as e:
-            logging.error(f"Failed to serialize message: {e}")
-            raise TypeError("Message must be a serializable dictionary.")
-        except (ConnectionResetError, BrokenPipeError):
-            logging.critical("Connection lost while sending message.")
-            raise ConnectionResetError("Connection lost while sending message.")
+            raise TypeError(f"Message could not be serialized: {e}")
 
-    def run(self):
-        """Client that interacts with the server."""
-
-        logging.debug("Waiting for initialization message from the server...")
-        while True:
+        # Attempt to send the message to the server, retrying if necessary
+        for attempt in range(self.attempts):
             try:
-                message = self.receive_message()
-            except ConnectionResetError:
-                return
+                self._socket.sendall(data)
+            except (ConnectionResetError, BrokenPipeError) as e:
+                logging.error(
+                    f"Unable to send message: {e}\nRetrying... ({attempt + 1}/{self.attempts})"
+                )
+                continue
+            # Message sent successfully, break the loop
+            logging.debug("Message sent successfully.")
+            return
+        else:
+            raise ConnectionRefusedError(
+                f"Failed to send message to server after {self.attempts} attempts."
+            )
 
-            match message.get("type"):
-                case "connect":
-                    match message["player"]:
-                        case "o":
-                            player = Player.Nought
-                        case "x":
-                            player = Player.Cross
-                        case _:
-                            logging.critical(
-                                f"Unknown player type received from the server: {message['player']}"
-                            )
-                            return
-                    logging.info(f"Assigned player: {player}")
-                    self.agent.player = player
-                    break
-                case _:
-                    logging.error(f"Received unexpected message: {message}")
-                    continue
 
-        # Make first move if player is Cross
-        if self.agent.player == Player.Cross:
-            logging.debug("Making the first move...")
-            chosen_opening = self.agent.decide_opening()
-            logging.info(f"Chosen opening move: {chosen_opening}")
+@dataclass(frozen=True)
+class InitializationMessage:
+    player: Player
 
-            try:
-                self.send_message(chosen_opening)
-            except TypeError:
-                return
-            except ConnectionResetError:
-                return
 
-            self.agent.make_move(chosen_opening)
-            logging.debug(f"\n{self.agent.board}")
+@dataclass(frozen=True)
+class MovementMessage:
+    player: Player
+    position: tuple[int, int]
 
-        while True:
-            try:
-                message = self.receive_message()
-            except ConnectionResetError:
-                return
 
-            match message.get("type"):
-                case "your_turn":
-                    opponent_move: tuple[int, int] = message["opponent_move"]
-                    logging.info(f"Opponent's move: {opponent_move}")
-                    self.agent.board[opponent_move] = self.agent.player.opponent()
-                    logging.debug(f"\n{self.agent.board}")
+@dataclass(frozen=True)
+class YourTurnMessage:
+    available_moves: list[tuple[int, int]]
 
-                    logging.debug("It's my turn to play.")
-                    available_moves: list[tuple[int, int]] = message["available_moves"]
-                    logging.debug(f"Available moves: {available_moves}")
 
-                    chosen_move = self.agent.decide_move(available_moves)
-                    logging.info(f"Chosen move: {chosen_move}")
+@dataclass(frozen=True)
+class GameOverMessage:
+    winner: Player | None
 
-                    try:
-                        self.send_message(chosen_move)
-                    except TypeError:
-                        return
-                    except ConnectionResetError:
-                        return
 
-                    self.agent.make_move(chosen_move)
-                    logging.debug(f"\n{self.agent.board}")
+ServerMessage = (
+    InitializationMessage | YourTurnMessage | MovementMessage | GameOverMessage
+)
 
-                case "game_finished":
-                    logging.info("Game finished!")
 
-                    result = message["result"]
-                    match result["type"]:
-                        case "draw":
-                            logging.info("It's a draw!")
+def parse_message(message) -> ServerMessage:
+    message_type = message.get("type")
+    match message_type:
+        case "initialization":
+            player = Player.from_str(message["player"])
+            if player == Player.Empty:
+                raise ValueError("Cannot initialize empty player")
+            return InitializationMessage(player=player)
 
-                        case "victory":
-                            winner = Player.from_str(result["player"])
-                            logging.info(f"Winner: {winner}!")
+        case "your_turn":
+            available_moves = message["available_moves"]
+            return YourTurnMessage(available_moves=available_moves)
 
-                        case _:
-                            pass
+        case "movement":
+            player = Player.from_str(message["player"])
+            position = message["position"]
+            return MovementMessage(player=player, position=position)
 
-                case "game_state":
-                    logging.debug("Received game state update.")
-                    self.agent.board = Board.from_json(message["board"])
+        case "game_over":
+            result = message["result"]
+            match result["type"]:
+                case "draw":
+                    return GameOverMessage(winner=None)
 
-                    logging.debug(f"Game state received:\n{self.agent.board}")
-
-                case "disconnect":
-                    logging.info("Received disconnect message from the server.")
-                    return
-
-                # TODO: Handle game errors more gracefully
-                case "game_error":
-                    error = message["error"]
-                    match error:
-                        case _:
-                            logging.error(f"Game error received: {error}")
-                    continue
+                case "victory":
+                    player = Player.from_str(result["player"])
+                    return GameOverMessage(winner=player)
 
                 case _:
-                    logging.error(f"Unexpected message received: {message}")
-                    continue
+                    raise ValueError(
+                        f"Unexpected game over result type: {result['type']}"
+                    )
+
+        case _:
+            raise ValueError(f"Unexpected message type: {message_type}")
 
 
 def main():
@@ -222,7 +266,7 @@ def main():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Parse command-line arguments
+    # Set up command-line argument parser
     parser = argparse.ArgumentParser(
         description="Tic-Tac-Toe Agent Client",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -238,34 +282,82 @@ def main():
         "-p",
         "--port",
         type=int,
-        help="Server port to connect to.",
         required=True,
+        help="Server port to connect to.",
     )
 
+    # Parse command-line arguments
     args = parser.parse_args()
     logging.debug(f"Arguments: {vars(args)}")
     addr: str = args.addr
     port: int = args.port
 
     try:
-        # Connect to the Tic-Tac-Toe server
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            client = Client(s)
-            # Attempt to connect to the server
-            logging.info(f"Connecting to server at {addr}:{port}...")
-            client.connect_to_server(addr, port)
+        with Client(addr, port) as client:
+            logging.debug("Waiting for inialization message from the server...")
+            while True:
+                message = client.receive_message()
+                try:
+                    message = parse_message(message)
+                except ValueError as e:
+                    logging.error(f"Failed to parse message: {e}")
+                    continue
+                match message:
+                    case InitializationMessage(player):
+                        logging.info(f"Assigned player: {player}")
+                        break
+                    case _:
+                        logging.error(f"Received unexpected message: {message}")
+                        continue
 
-            # Launch the client to interact with the server
-            client.run()
+            logging.debug("Creating agent...")
+            agent = Agent(player)
 
-    except ConnectionRefusedError as e:
-        logging.critical(f"Could not connect to the server: {e}")
-        return
+            # Enter game loop
+            logging.debug("Entering game loop...")
+            while True:
+                # Wait for a message from the server
+                message = client.receive_message()
+                try:
+                    message = parse_message(message)
+                except ValueError as e:
+                    logging.error(f"Failed to parse message: {e}")
+                    continue
+                logging.debug(f"Parsed message: {printer.pformat(message)}")
+
+                match message:
+                    case YourTurnMessage(available_moves):
+                        logging.info("It's your turn to make a move.")
+                        logging.debug(f"Available moves: {available_moves}")
+                        chosen_move = agent.decide_move(available_moves)
+                        logging.info(f"Chosen move: {chosen_move}")
+                        client.send_message(
+                            {"type": "movement", "position": chosen_move}
+                        )
+
+                    case MovementMessage(player, pos):
+                        logging.info(f"Player {player} made move {pos}")
+                        agent.board[pos] = player
+                        logging.debug(f"Current board state:\n{agent.board}")
+
+                    case GameOverMessage(winner):
+                        logging.info("Game over.")
+                        if winner:
+                            logging.info(f"Winner: {winner}")
+                        else:
+                            logging.info("The game ended in a draw.")
+                        return
+
+                    case _:
+                        logging.error(f"Received unexpected message: {message}")
+                        continue
+
     except KeyboardInterrupt:
-        logging.warning("\nConnection closed by user.")
+        logging.info("Client interrupted by user.")
         return
+
     except Exception as e:
-        logging.critical(f"An unexpected error occurred: {e}")
+        logging.critical(f"An error occurred: {e}")
         return
 
 
