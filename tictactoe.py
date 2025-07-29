@@ -3,7 +3,6 @@
 This module implements the game logic and an agent capable of playing the game.
 """
 
-import logging
 import random
 from enum import IntEnum
 from typing import Self, final, override
@@ -142,12 +141,10 @@ class Agent:
 
     def decide_opening(self) -> tuple[int, int]:
         chosen_opening = random.choice([(i, j) for i in range(3) for j in range(3)])
-        logging.debug(f"Chosen opening move: {chosen_opening}")
         return chosen_opening
 
-    def decide_move(self, available_actions: list[tuple[int, int]]) -> tuple[int, int]:
-        chosen_move = random.choice(available_actions)
-        logging.debug(f"Chosen move: {chosen_move}")
+    def decide_move(self, available_moves: list[tuple[int, int]]) -> tuple[int, int]:
+        chosen_move = random.choice(available_moves)
         return chosen_move
 
     def make_move(self, position: tuple[int, int]):
