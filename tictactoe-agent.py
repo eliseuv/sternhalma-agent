@@ -133,9 +133,9 @@ class Client:
         for attempt in range(self.attempts):
             try:
                 data = self._socket.recv(self.buf_size)
-            except ConnectionResetError:
+            except ConnectionResetError as e:
                 logging.error(
-                    f"Connection error. Retrying... ({attempt + 1}/{self.attempts})"
+                    f"Connection error: {e}. Retrying... ({attempt + 1}/{self.attempts})"
                 )
                 continue
             # Check if connection was closed by the server
@@ -144,9 +144,9 @@ class Client:
             # Attempt to decode the received data
             try:
                 message = cbor2.loads(data)
-            except cbor2.CBORDecodeError:
+            except cbor2.CBORDecodeError as e:
                 logging.error(
-                    f"Received malformed data from the server:\n{data}\nRetrying... ({attempt + 1}/{self.attempts})"
+                    f"Received malformed data from the server: {e}\n{data}\nRetrying... ({attempt + 1}/{self.attempts})"
                 )
                 continue
             # Message successfully received and decoded
@@ -168,7 +168,7 @@ class Client:
             ConnectionResetError: If the connection to the server is lost while sending the message.
         """
 
-        logging.debug(f"Sending message:\n{message}")
+        logging.debug(f"Sending message:\n{printer.pformat(message)}")
 
         # Serialize the message
         try:
