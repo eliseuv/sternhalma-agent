@@ -3,6 +3,7 @@
 This module implements the game logic and an agent capable of playing the game.
 """
 
+from dataclasses import dataclass
 import random
 from enum import IntEnum
 from typing import Self, final, override
@@ -124,6 +125,23 @@ class Board:
             self.board[row][col] = player
         else:
             raise ValueError("Cell is already occupied.")
+
+
+@dataclass(frozen=True)
+class GameResult:
+    pass
+
+
+@final
+@dataclass(frozen=True)
+class GameResultDraw(GameResult):
+    pass
+
+
+@final
+@dataclass(frozen=True)
+class GameResultVictory(GameResult):
+    player: Player
 
 
 @final
