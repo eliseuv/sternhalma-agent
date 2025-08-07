@@ -64,6 +64,12 @@ class ServerMessageAssign(ServerMessage):
 
 @final
 @dataclass(frozen=True)
+class ServerMessageDisconnect(ServerMessage):
+    pass
+
+
+@final
+@dataclass(frozen=True)
 class ServerMessageTurn(ServerMessage):
     available_moves: list[tuple[int, int]]
 
@@ -96,6 +102,9 @@ def parse_message(message_dict) -> ServerMessage:
                 case _:
                     raise ValueError("Invalid player")
             return ServerMessageAssign(player=player)
+
+        case "disconnect":
+            return ServerMessageDisconnect()
 
         case "turn":
             available_moves = message_dict["available_moves"]
@@ -323,6 +332,10 @@ async def main():
                     position = agent.decide_move(available_moves)
                     logging.debug(f"Chosen move: {position}")
                     await client.send_message(ClientMessageMovement(position=position))
+
+                case ServerMessageDisconnect():
+                    logging.info("Disconnection signal received")
+                    break
 
                 case ServerMessageMovement(player, position):
                     logging.debug(f"Player {player} made move {position}")
