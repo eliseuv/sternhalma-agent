@@ -7,12 +7,12 @@ import struct
 import logging
 from typing import final, override
 
-from sternhalma import Agent, Movement, Player
+from games.sternhalma import Agent, Movement, Player
 
 
 # Set up logging configuration
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="[{asctime} {levelname}] {message}",
     style="{",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -46,6 +46,7 @@ logging.debug(f"Arguments: {printer.pformat(vars(args))}")
 
 
 # Server -> Client
+@dataclass(frozen=True)
 class ServerMessage:
     pass
 
@@ -81,41 +82,43 @@ class ServerMessageGameFinished(ServerMessage):
     winner: Player
 
 
-def parse_message(message_dict) -> ServerMessage:
-    match message_dict.get("type"):
+def parse_message(message: dict[str, object]) -> ServerMessage:
+    match message.get("type"):
         case "assign":
-            match message_dict["player"]:
+            match message["player"]:
                 case "1":
-                    player = Player.Player1
+                    return ServerMessageAssign(player=Player.Player1)
                 case "2":
-                    player = Player.Player2
+                    return ServerMessageAssign(player=Player.Player2)
                 case _:
                     raise ValueError("Invalid player")
-            return ServerMessageAssign(player=player)
 
         case "disconnect":
             return ServerMessageDisconnect()
 
         case "turn":
-            movements = message_dict["movements"]
+            movements = [
+                list(map(tuple, movement)) for movement in message["movements"]
+            ]
             return ServerMessageTurn(movements=movements)
 
         case "movement":
-            player = Player.from_str(message_dict["player"])
-            movement = message_dict["movement"]
-            return ServerMessageMovement(player=player, movement=movement)
+            movement = list(map(tuple, message["movement"]))
+            return ServerMessageMovement(
+                player=Player.from_str(message["player"]), movement=movement
+            )
 
         case "game_finished":
-            winner = Player.from_str(message_dict["winner"])
-            return ServerMessageGameFinished(winner=winner)
+            return ServerMessageGameFinished(winner=Player.from_str(message["winner"]))
 
         case _:
-            raise ValueError(f"Unexpected message type: {message_dict.get('type')}")
+            raise ValueError(f"Unexpected message type: {message.get('type')}")
 
 
 # Client -> Server
+@dataclass(frozen=True)
 class ClientMessage:
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {}
 
 
@@ -125,7 +128,7 @@ class ClientMessageTest(ClientMessage):
     num: int
 
     @override
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {"type": "test", **vars(self)}
 
 
@@ -135,7 +138,7 @@ class ClientMessageChoice(ClientMessage):
     index: int
 
     @override
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {"type": "choice", **vars(self)}
 
 
@@ -232,7 +235,7 @@ class Client:
         message_json = message_bytes.decode("utf-8")
         logging.debug(f"Message JSON: {message_json}")
 
-        message_dict = json.loads(message_json)
+        message_dict: dict[str, object] = json.loads(message_json)
         logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
         # Parse message
@@ -307,20 +310,22 @@ async def main():
             match message:
                 case ServerMessageTurn(available_moves):
                     logging.debug("It's my turn")
-                    index = agent.decide_move(available_moves)
+                    index = agent.decide_move(Agent.BrownianStrategy(), available_moves)
                     logging.debug(f"Chosen move: {available_moves[index]}")
                     await client.send_message(ClientMessageChoice(index=index))
 
-                case ServerMessageDisconnect():
-                    logging.info("Disconnection signal received")
-                    break
-
                 case ServerMessageMovement(player, indices):
                     logging.debug(f"Player {player} made move {indices}")
+                    agent.board.apply_movement(indices)
+                    # agent.board.print()
 
                 case ServerMessageGameFinished(winner):
-                    logging.info("fGame finished! Winner: {winner}")
+                    logging.info(f"Game finished! Winner: {winner}")
                     # Break out of game loop
+                    break
+
+                case ServerMessageDisconnect():
+                    logging.info("Disconnection signal received")
                     break
 
                 case _:
