@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from enum import IntEnum
-import random
-from typing import final, override
+from typing import final
 
 import numpy as np
 from numpy.typing import NDArray
@@ -161,44 +160,3 @@ class Board:
         #     raise ValueError(f"Invalid movement from {from_idx} to {to_idx}")
         self[to_idx] = player
         self[from_idx] = Position.Empty
-
-
-@final
-class Agent:
-    def __init__(self, player: Player):
-        self.player = player
-        self.board = Board.two_players()
-
-    class Strategy:
-        def select_move(self, movements: list[Movement]) -> int:
-            raise NotImplementedError
-
-    @final
-    class BrownianStrategy(Strategy):
-        @override
-        def select_move(self, movements: list[Movement]) -> int:
-            return random.randrange(0, len(movements))
-
-    @final
-    @dataclass(frozen=True)
-    class AheadStrategy(Strategy):
-        player: Player
-
-        @override
-        def select_move(self, movements: list[Movement]) -> int:
-            movements_sorted = sorted(enumerate(movements), key=lambda mv: mv[1][1])
-            match self.player:
-                case Player.Player1:
-                    if random.random() < 0.5:
-                        return movements_sorted[-1][0]
-                    else:
-                        return movements_sorted[-2][0]
-
-                case Player.Player2:
-                    if random.random() < 0.5:
-                        return movements_sorted[0][0]
-                    else:
-                        return movements_sorted[1][0]
-
-    def decide_move(self, strategy: Strategy, movements: list[Movement]) -> int:
-        return strategy.select_move(movements)
