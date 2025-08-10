@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import argparse
 import asyncio
 from dataclasses import dataclass
@@ -7,7 +8,8 @@ import struct
 import logging
 from typing import final, override
 
-from games.sternhalma import Agent, Movement, Player
+from sternhalma import Movement, Player
+from agent import Agent, AheadStrategy
 
 
 # Set up logging configuration
@@ -46,8 +48,7 @@ logging.debug(f"Arguments: {printer.pformat(vars(args))}")
 
 
 # Server -> Client
-@dataclass(frozen=True)
-class ServerMessage:
+class ServerMessage(ABC):
     pass
 
 
@@ -116,10 +117,10 @@ def parse_message(message: dict[str, object]) -> ServerMessage:
 
 
 # Client -> Server
-@dataclass(frozen=True)
-class ClientMessage:
+class ClientMessage(ABC):
+    @abstractmethod
     def to_dict(self) -> dict[str, object]:
-        return {}
+        pass
 
 
 @final
@@ -302,16 +303,18 @@ async def main():
 
         # Create game agent
         agent = Agent(player)
+        logging.info(f"Created agent for player {player}")
+        logging.info(f"Agent strategy: {agent.strategy.__class__.__name__}")
 
         # Game loop
         while True:
             message = await client.receive_message()
 
             match message:
-                case ServerMessageTurn(available_moves):
+                case ServerMessageTurn(movements):
                     logging.debug("It's my turn")
-                    index = agent.decide_move(Agent.BrownianStrategy(), available_moves)
-                    logging.debug(f"Chosen move: {available_moves[index]}")
+                    index = agent.decide_move(movements)
+                    logging.debug(f"Chosen move: {movements[index]}")
                     await client.send_message(ClientMessageChoice(index=index))
 
                 case ServerMessageMovement(player, indices):
