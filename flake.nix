@@ -1,20 +1,22 @@
 {
-  description = "Python env";
+  description = "Python development environment with libraries";
 
   inputs = {
+    nixpkgs.url = "nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   };
 
   outputs =
     {
-      flake-utils,
+      self,
       nixpkgs,
+      flake-utils,
       ...
-    }:
+    }@inputs:
     let
+      system = "x86_64-linux";
       pkgs = import nixpkgs {
-        system = "x86_64-linux";
+        inherit system;
         config.allowUnfree = true;
       };
     in
@@ -22,10 +24,6 @@
       devShells.x86_64-linux.default = pkgs.mkShell {
 
         packages = with pkgs; [
-
-          # CUDA
-          # cudatoolkit
-          # cudaPackages.cudnn
 
           # Python
           (python3.withPackages (
@@ -38,6 +36,11 @@
               pytorch
             ]
           ))
+
+          # CUDA
+          # cudatoolkit
+          # cudaPackages.cudnn
+
         ];
 
         # shellHook = ''
