@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import final
+from typing import final, override
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,6 +20,7 @@ class Player(IntEnum):
             case _:
                 raise ValueError(f"Unknown player string: {player_str}")
 
+    @override
     def __str__(self) -> str:
         match self:
             case Player.Player1:
@@ -95,6 +96,7 @@ class Position(IntEnum):
             case Player.Player2:
                 return Position.Player2
 
+    @override
     def __str__(self) -> str:
         match self:
             case Position.Invalid:

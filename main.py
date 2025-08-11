@@ -14,7 +14,7 @@ from agent import Agent, AheadStrategy
 
 # Set up logging configuration
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="[{asctime} {levelname}] {message}",
     style="{",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -302,9 +302,8 @@ async def main():
                     continue
 
         # Create game agent
-        agent = Agent(player)
-        logging.info(f"Created agent for player {player}")
-        logging.info(f"Agent strategy: {agent.strategy.__class__.__name__}")
+        agent = Agent(player, AheadStrategy(player))
+        logging.info(f"Created agent with strategy: {agent.strategy}")
 
         # Game loop
         while True:
