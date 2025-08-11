@@ -8,13 +8,16 @@ import struct
 import logging
 from typing import final, override
 
+import numpy as np
+from numpy.typing import NDArray
+
 from sternhalma import Movement, Player
-from agent import Agent, AheadStrategy
+from agent import Agent, AheadStrategy, BrownianStrategy
 
 
 # Set up logging configuration
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="[{asctime} {levelname}] {message}",
     style="{",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -67,14 +70,14 @@ class ServerMessageDisconnect(ServerMessage):
 @final
 @dataclass(frozen=True)
 class ServerMessageTurn(ServerMessage):
-    movements: list[Movement]
+    movements: NDArray[np.uintp]
 
 
 @final
 @dataclass(frozen=True)
 class ServerMessageMovement(ServerMessage):
     player: Player
-    movement: Movement
+    movement: NDArray[np.uintp]
 
 
 @final
@@ -98,19 +101,18 @@ def parse_message(message: dict[str, object]) -> ServerMessage:
             return ServerMessageDisconnect()
 
         case "turn":
-            movements = [
-                list(map(tuple, movement)) for movement in message["movements"]
-            ]
-            return ServerMessageTurn(movements=movements)
+            return ServerMessageTurn(movements=np.array(message["movements"]))
 
         case "movement":
-            movement = list(map(tuple, message["movement"]))
             return ServerMessageMovement(
-                player=Player.from_str(message["player"]), movement=movement
+                player=Player.from_str(str(message["player"])),
+                movement=np.array(message["movement"]),
             )
 
         case "game_finished":
-            return ServerMessageGameFinished(winner=Player.from_str(message["winner"]))
+            return ServerMessageGameFinished(
+                winner=Player.from_str(str(message["winner"]))
+            )
 
         case _:
             raise ValueError(f"Unexpected message type: {message.get('type')}")
@@ -162,8 +164,8 @@ class Client:
         self.attempts = attempts
 
         # Stream reader and writer
-        self.reader: asyncio.StreamReader = None
-        self.writer: asyncio.StreamWriter = None
+        self.reader: asyncio.StreamReader = None  # pyright: ignore [reportAttributeAccessIssue]
+        self.writer: asyncio.StreamWriter = None  # pyright: ignore [reportAttributeAccessIssue]
 
     async def __aenter__(self):
         logging.info(f"Connecting to server at {self.host}:{self.port}")
@@ -193,7 +195,7 @@ class Client:
                 f"Failed to connect to the server after {self.attempts} attempts."
             )
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):  # pyright: ignore [reportMissingParameterType, reportUnknownParameterType]
         if self.writer:
             self.writer.close()
             await self.writer.wait_closed()
@@ -219,7 +221,7 @@ class Client:
             else:
                 raise
 
-        length: int = struct.unpack(">I", length_bytes)[0]
+        length = int(struct.unpack(">I", length_bytes)[0])
         logging.debug(f"Message length: {length} bytes")
 
         # Read the actual message payload
@@ -302,7 +304,7 @@ async def main():
                     continue
 
         # Create game agent
-        agent = Agent(player, AheadStrategy(player))
+        agent = Agent(player, BrownianStrategy())
         logging.info(f"Created agent with strategy: {agent.strategy}")
 
         # Game loop
