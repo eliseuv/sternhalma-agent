@@ -1,9 +1,11 @@
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import IntEnum
+from types import FunctionType
 from typing import final, override
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, DTypeLike, NDArray
 
 
 class Player(IntEnum):
@@ -35,11 +37,25 @@ class GameResult:
 
 
 # Axial index in the hexagonal board
-type BoardIndex = NDArray[np.uintp]
+# Array of shape (2,)
+type BoardIndex = NDArray[np.int_]
+
+
+# Hexagonal distance between two cells in the hexagonal grid
+# How many steps it takes to get from one cell to another
+def hexagonal_distance(i: BoardIndex, j: BoardIndex) -> np.int_:
+    d = j - i
+    return np.max(np.abs([d[0], d[1], d[0] + d[1]]))
+
+
+# Euclidean distance between two cells on the board
+def euclidean_distance(i: BoardIndex, j: BoardIndex) -> np.float64:
+    d = j - i
+    return np.sqrt(np.square(d[0] + d[1]) - (d[0] * d[1]))
 
 
 # Valid positions on the board
-VALID_POSITIONS: NDArray[np.uintp] = np.transpose([
+VALID_POSITIONS: NDArray[np.int_] = np.transpose([
                                            [0,12],
                                        [1,11],[1,12],
                                     [2,10],[2,11],[2,12],
@@ -60,7 +76,7 @@ VALID_POSITIONS: NDArray[np.uintp] = np.transpose([
 ])  # fmt: skip
 
 # Starting positions of player 1
-PLAYER1_STARTING_POSITIONS: NDArray[np.uintp] = np.transpose([
+PLAYER1_STARTING_POSITIONS: NDArray[np.int_] = np.transpose([
 [12,4],[12,5],[12,6],[12,7],[12,8],
     [13,4],[13,5],[13,6],[13,7],
        [14,4],[14,5],[14,6],
@@ -69,7 +85,7 @@ PLAYER1_STARTING_POSITIONS: NDArray[np.uintp] = np.transpose([
 ])  # fmt: skip
 
 # Starting positions of player 2
-PLAYER2_STARTING_POSITIONS: NDArray[np.uintp] = np.transpose([
+PLAYER2_STARTING_POSITIONS: NDArray[np.int_] = np.transpose([
             [0,12],
         [1,11],[1,12],
      [2,10],[2,11],[2,12],
@@ -78,8 +94,22 @@ PLAYER2_STARTING_POSITIONS: NDArray[np.uintp] = np.transpose([
 ])  # fmt: skip
 
 
-# A movement is represented as a pair of board indices: (from, to)
-type Movement = NDArray[np.uintp]
+def hexgrid_map(f: FunctionType, hexgrid: ArrayLike):
+    return map(lambda row: map(f, row), hexgrid)
+
+
+def hexgrid_str[T](hexgrid: ArrayLike) -> str:
+    return "\n".join(
+        map(
+            lambda e: " " * e[0] + "".join(map(lambda x: str(x), e[1])),
+            enumerate(hexgrid),
+        )
+    )
+
+
+# Movement of a piece on the board represented by a pair of board indices
+# Array of shape (2, 2)
+type Movement = NDArray[np.int_]
 
 
 class Position(IntEnum):
@@ -134,15 +164,7 @@ class Board:
         self.state[tuple(idx)] = position
 
     def print(self):
-        print(
-            "\n".join(
-                map(
-                    lambda e: " " * e[0]
-                    + "".join(map(lambda x: str(Position(x)), e[1])),
-                    enumerate(self.state),
-                )
-            )
-        )
+        print(hexgrid_str(hexgrid_map(Position, self.state)))
 
     def apply_movement(self, movement: Movement) -> None:
         self.state[tuple(movement[1])] = self.state[tuple(movement[0])]
