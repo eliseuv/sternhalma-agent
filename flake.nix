@@ -28,6 +28,8 @@
           # Python
           (python3.withPackages (
             pypkgs: with pypkgs; [
+              # CBOR
+              cbor2
               # Numerical
               numpy
               scipy
