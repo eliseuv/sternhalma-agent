@@ -1,16 +1,13 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
-import random
 from typing import final, override
 
 import numpy as np
 from numpy.typing import NDArray
 
-from sternhalma import (
+from .board import (
     PLAYER1_STARTING_POSITIONS,
     PLAYER2_STARTING_POSITIONS,
     Board,
-    Movement,
     Player,
 )
 
@@ -34,26 +31,28 @@ class AheadStrategy(Strategy):
         self.player = player
         match player:
             case Player.Player1:
-                self.goal = PLAYER2_STARTING_POSITIONS
+                self.goal = set(map(tuple, PLAYER2_STARTING_POSITIONS))
             case Player.Player2:
-                self.goal = PLAYER1_STARTING_POSITIONS
+                self.goal = set(map(tuple, PLAYER1_STARTING_POSITIONS))
 
     @override
-        if random.random() < 0.5:
-            return self.sort_movements_y(self.filter_out_goal(movements))[1][0]
-        else:
-            return random.randrange(0, len(movements))
-
-    def filter_out_goal(self, movements: Iterator[Movement]):
-        return filter(lambda mv: mv[0] not in self.goal, movements)
-
-    def sort_movements_y(self, movements: Iterator[Movement]):
     def select_move(self, movements: NDArray[np.int_]) -> int:
-        return sorted(
-            enumerate(movements),
-            key=lambda mv: mv[1][1],
-            reverse=(self.player == Player.Player2),
-        )
+        pass
+        # return sorted(
+        #     filter(
+        #         lambda mv: ,
+        #         enumerate(movements),
+        #     ),
+        #     key=lambda mv: min(map(hexagonal_metric, self.goal.T - mv[1][1])),
+        # )[np.random.poisson(3)][0]
+        # return sorted(
+        #     filter(
+        #         lambda mv: bool((self.goal.T != mv[1][0]).all(1).any()),
+        #         enumerate(movements),
+        #     ),
+        #     key=lambda mv: np.linalg.norm(mv[1][0] - self.goal, axis=1).min(),
+        #     reverse=True,
+        # )[np.random.poisson(1)][0]
 
 
 @final

@@ -1,11 +1,10 @@
-from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import IntEnum
 from types import FunctionType
 from typing import final, override
 
 import numpy as np
-from numpy.typing import ArrayLike, DTypeLike, NDArray
+from numpy.typing import ArrayLike, NDArray
 
 
 class Player(IntEnum):
@@ -31,31 +30,32 @@ class Player(IntEnum):
                 return "🔴"
 
 
-@dataclass(frozen=True)
-class GameResult:
-    winner: Player
-
-
 # Axial index in the hexagonal board
 # Array of shape (2,)
 type BoardIndex = NDArray[np.int_]
 
 
-# Hexagonal distance between two cells in the hexagonal grid
 # How many steps it takes to get from one cell to another
-def hexagonal_distance(i: BoardIndex, j: BoardIndex) -> np.int_:
-    d = j - i
+def hexagonal_metric(d: BoardIndex) -> np.int_:
     return np.max(np.abs([d[0], d[1], d[0] + d[1]]))
 
 
-# Euclidean distance between two cells on the board
-def euclidean_distance(i: BoardIndex, j: BoardIndex) -> np.float64:
-    d = j - i
+def hexagonal_distance(i: BoardIndex, j: BoardIndex) -> np.int_:
+    return hexagonal_metric(j - i)
+
+
+# Euclidean metric on the hexagonal grid
+def euclidean_metric(d: BoardIndex) -> np.float64:
     return np.sqrt(np.square(d[0] + d[1]) - (d[0] * d[1]))
 
 
+def euclidean_distance(i: BoardIndex, j: BoardIndex) -> np.float64:
+    return euclidean_metric(j - i)
+
+
 # Valid positions on the board
-VALID_POSITIONS: NDArray[np.int_] = np.transpose([
+# Stored as tuple of
+VALID_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np.transpose([
                                            [0,12],
                                        [1,11],[1,12],
                                     [2,10],[2,11],[2,12],
@@ -73,43 +73,25 @@ VALID_POSITIONS: NDArray[np.int_] = np.transpose([
                                    [14,4],[14,5],[14,6],
                                        [15,4],[15,5],
                                           [16,4],
-])  # fmt: skip
+]))  # fmt: skip
 
 # Starting positions of player 1
-PLAYER1_STARTING_POSITIONS: NDArray[np.int_] = np.transpose([
+PLAYER1_STARTING_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np.transpose([
 [12,4],[12,5],[12,6],[12,7],[12,8],
     [13,4],[13,5],[13,6],[13,7],
        [14,4],[14,5],[14,6],
            [15,4],[15,5],
               [16,4],
-])  # fmt: skip
+]))  # fmt: skip
 
 # Starting positions of player 2
-PLAYER2_STARTING_POSITIONS: NDArray[np.int_] = np.transpose([
+PLAYER2_STARTING_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np.transpose([
             [0,12],
         [1,11],[1,12],
      [2,10],[2,11],[2,12],
   [3,9],[3,10],[3,11],[3,12],
 [4,8],[4,9],[4,10],[4,11],[4,12],
-])  # fmt: skip
-
-
-def hexgrid_map(f: FunctionType, hexgrid: ArrayLike):
-    return map(lambda row: map(f, row), hexgrid)
-
-
-def hexgrid_str[T](hexgrid: ArrayLike) -> str:
-    return "\n".join(
-        map(
-            lambda e: " " * e[0] + "".join(map(lambda x: str(x), e[1])),
-            enumerate(hexgrid),
-        )
-    )
-
-
-# Movement of a piece on the board represented by a pair of board indices
-# Array of shape (2, 2)
-type Movement = NDArray[np.int_]
+]))  # fmt: skip
 
 
 class Position(IntEnum):
@@ -139,6 +121,11 @@ class Position(IntEnum):
                 return f"{Player.Player2} "
 
 
+# Movement of a piece on the board represented by a pair of board indices
+# Array of shape (2, 2)
+type Movement = NDArray[np.int_]
+
+
 @final
 @dataclass
 class Board:
@@ -147,14 +134,14 @@ class Board:
     @classmethod
     def empty(cls) -> "Board":
         state = np.full((17, 17), Position.Invalid, dtype=np.int32)
-        state[tuple(VALID_POSITIONS)] = Position.Empty
+        state[VALID_POSITIONS] = Position.Empty
         return cls(state=state)
 
     @classmethod
     def two_players(cls) -> "Board":
         state = Board.empty().state
-        state[tuple(PLAYER1_STARTING_POSITIONS)] = Position.Player1
-        state[tuple(PLAYER2_STARTING_POSITIONS)] = Position.Player2
+        state[PLAYER1_STARTING_POSITIONS] = Position.Player1
+        state[PLAYER2_STARTING_POSITIONS] = Position.Player2
         return cls(state=state)
 
     def __getitem__(self, idx: BoardIndex) -> Position:
@@ -163,9 +150,22 @@ class Board:
     def __setitem__(self, idx: BoardIndex, position: Position) -> None:
         self.state[tuple(idx)] = position
 
-    def print(self):
-        print(hexgrid_str(hexgrid_map(Position, self.state)))
-
     def apply_movement(self, movement: Movement) -> None:
-        self.state[tuple(movement[1])] = self.state[tuple(movement[0])]
-        self.state[tuple(movement[0])] = Position.Empty
+        self.state[movement[1]] = self.state[tuple(movement[0])]
+        self.state[movement[0]] = Position.Empty
+
+    def print(self):
+        print(
+            "\n".join(
+                map(
+                    lambda e: " " * e[0]
+                    + "".join(map(lambda x: str(Position(x)), e[1])),
+                    enumerate(self.state),
+                )
+            )
+        )
+
+
+@dataclass(frozen=True)
+class GameResult:
+    winner: Player
