@@ -17,15 +17,15 @@ from sternhalma import (
 
 class Strategy(ABC):
     @abstractmethod
-    def select_move(self, movements: NDArray[np.int_]) -> int:
+    def select_move(self, movements: NDArray[np.int_]) -> NDArray[np.int_]:
         pass
 
 
 @final
 class BrownianStrategy(Strategy):
     @override
-        return random.randrange(0, len(movements))
-    def select_move(self, movements: NDArray[np.int_]) -> int:
+    def select_move(self, movements: NDArray[np.int_]) -> NDArray[np.int_]:
+        return movements[np.random.randint(0, len(movements))]
 
 
 @final
@@ -63,5 +63,5 @@ class Agent:
         self.strategy = strategy
         self.board = Board.two_players()
 
-    def decide_move(self, movements: NDArray[np.int_]) -> int:
+    def decide_move(self, movements: NDArray[np.int_]) -> NDArray[np.int_]:
         return self.strategy.select_move(movements)

@@ -130,7 +130,7 @@ class ClientMessageTest(ClientMessage):
 @final
 @dataclass(frozen=True)
 class ClientMessageChoice(ClientMessage):
-    index: int
+    movement: NDArray[np.int_]
 
     @override
     def to_dict(self) -> dict[str, object]:
@@ -304,9 +304,9 @@ async def main():
             match message:
                 case ServerMessageTurn(movements):
                     logging.debug("It's my turn")
-                    index = agent.decide_move(movements)
-                    logging.debug(f"Chosen move: {movements[index]}")
-                    await client.send_message(ClientMessageChoice(index=index))
+                    movement = agent.decide_move(movements).tolist()
+                    logging.debug(f"Chosen movement: {movement}")
+                    await client.send_message(ClientMessageChoice(movement=movement))
 
                 case ServerMessageMovement(player, indices):
                     logging.debug(f"Player {player} made move {indices}")
