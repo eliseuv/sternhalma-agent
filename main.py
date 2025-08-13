@@ -11,8 +11,8 @@ from typing import final, override
 import numpy as np
 from numpy.typing import NDArray
 
-from sternhalma import Movement, Player
-from agent import Agent, AheadStrategy, BrownianStrategy
+from sternhalma import Player
+from agent import Agent, BrownianStrategy
 
 
 # Set up logging configuration
@@ -32,17 +32,9 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 _ = parser.add_argument(
-    "--host",
+    "--socket",
     type=str,
-    default="127.0.0.1",
-    help="Host address",
-)
-_ = parser.add_argument(
-    "-p",
-    "--port",
-    type=int,
-    required=True,
-    help="Port",
+    help="Unix socket path",
 )
 
 # Parse command-line arguments
@@ -149,15 +141,13 @@ class ClientMessageChoice(ClientMessage):
 class Client:
     def __init__(
         self,
-        host: str,
-        port: int,
+        socket: str,
         delay: float = 0.100,  # 100ms
         attempts: int = 10,
         buf_size: int = 1024,
     ):
         # Socket connection parameters
-        self.host = host
-        self.port = port
+        self.path = socket
 
         # Connection retry parameters
         self.delay = delay
@@ -168,14 +158,20 @@ class Client:
         self.writer: asyncio.StreamWriter = None  # pyright: ignore [reportAttributeAccessIssue]
 
     async def __aenter__(self):
-        logging.info(f"Connecting to server at {self.host}:{self.port}")
+        logging.info(f"Connecting to server at {self.path}")
         for attempt in range(self.attempts):
             try:
-                self.reader, self.writer = await asyncio.open_connection(
-                    self.host, self.port
-                )
+                self.reader, self.writer = await asyncio.open_unix_connection(self.path)
                 logging.info("Connection established successfully")
                 return self
+
+            # If the socket file is not found, log the error, wait and retry
+            except FileNotFoundError:
+                logging.error(
+                    f"Socket file not found. Retrying {attempt + 1}/{self.attempts}"
+                )
+                await asyncio.sleep(self.delay)
+                continue
 
             # If the connection is refused, log the error, wait and retry
             except ConnectionRefusedError:
@@ -287,7 +283,7 @@ class Client:
 
 
 async def main():
-    async with Client(args.host, args.port) as client:
+    async with Client(args.socket) as client:
         # Wait for assignment message
         while True:
             message = await client.receive_message()
