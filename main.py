@@ -121,16 +121,6 @@ class ClientMessage(ABC):
 
 @final
 @dataclass(frozen=True)
-class ClientMessageTest(ClientMessage):
-    num: int
-
-    @override
-    def to_dict(self) -> dict[str, object]:
-        return {"type": "test", **vars(self)}
-
-
-@final
-@dataclass(frozen=True)
 class ClientMessageChoice(ClientMessage):
     movement: NDArray[np.int_]
 
@@ -255,7 +245,7 @@ class Client:
 
         length_bytes = struct.pack(">I", length)
 
-        for attempt in range(self.attempts):
+        for _ in range(self.attempts):
             # Write the 4-byte length prefix and then the message payload
             try:
                 self.writer.write(length_bytes)
@@ -297,7 +287,9 @@ async def main():
 
         # Create game agent
         agent = Agent(player, BrownianStrategy())
-        logging.info(f"Created agent with strategy: {agent.strategy}")
+        logging.info(
+            f"Created agent with strategy: {agent.strategy.__class__.__name__}"
+        )
 
         # Game loop
         while True:
