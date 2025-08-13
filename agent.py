@@ -17,15 +17,15 @@ from sternhalma import (
 
 class Strategy(ABC):
     @abstractmethod
-    def select_move(self, movements: NDArray[np.uintp]) -> int:
+    def select_move(self, movements: NDArray[np.int_]) -> int:
         pass
 
 
 @final
 class BrownianStrategy(Strategy):
     @override
-    def select_move(self, movements: NDArray[np.uintp]) -> int:
         return random.randrange(0, len(movements))
+    def select_move(self, movements: NDArray[np.int_]) -> int:
 
 
 @final
@@ -39,7 +39,6 @@ class AheadStrategy(Strategy):
                 self.goal = PLAYER1_STARTING_POSITIONS
 
     @override
-    def select_move(self, movements: NDArray[np.uintp]) -> int:
         if random.random() < 0.5:
             return self.sort_movements_y(self.filter_out_goal(movements))[1][0]
         else:
@@ -49,6 +48,7 @@ class AheadStrategy(Strategy):
         return filter(lambda mv: mv[0] not in self.goal, movements)
 
     def sort_movements_y(self, movements: Iterator[Movement]):
+    def select_move(self, movements: NDArray[np.int_]) -> int:
         return sorted(
             enumerate(movements),
             key=lambda mv: mv[1][1],
@@ -63,5 +63,5 @@ class Agent:
         self.strategy = strategy
         self.board = Board.two_players()
 
-    def decide_move(self, movements: NDArray[np.uintp]) -> int:
+    def decide_move(self, movements: NDArray[np.int_]) -> int:
         return self.strategy.select_move(movements)
