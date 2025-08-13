@@ -11,8 +11,8 @@ from typing import final, override
 import numpy as np
 from numpy.typing import NDArray
 
-from sternhalma import Player
-from agent import Agent, BrownianStrategy
+from sternhalma.board import Player
+from sternhalma.agent import Agent, AheadStrategy, BrownianStrategy
 
 
 # Set up logging configuration
