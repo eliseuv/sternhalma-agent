@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import argparse
 import asyncio
 from dataclasses import dataclass
-import json
+import cbor2
 from pprint import PrettyPrinter
 import struct
 import logging
@@ -231,10 +231,7 @@ class Client:
                 raise
 
         # Decode message
-        message_json = message_bytes.decode("utf-8")
-        logging.debug(f"Message JSON: {message_json}")
-
-        message_dict: dict[str, object] = json.loads(message_json)
+        message_dict: dict[str, object] = cbor2.loads(message_bytes)
         logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
         # Parse message
@@ -249,10 +246,7 @@ class Client:
         message_dict = message.to_dict()
         logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
-        message_json = json.dumps(message_dict)
-        logging.debug(f"Message JSON: {message_json}")
-
-        message_bytes = message_json.encode("utf-8")
+        message_bytes = cbor2.dumps(message_dict)
 
         length: int = len(message_bytes)
         logging.debug(f"Message length: {length} bytes")
