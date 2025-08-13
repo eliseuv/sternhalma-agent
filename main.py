@@ -62,14 +62,14 @@ class ServerMessageDisconnect(ServerMessage):
 @final
 @dataclass(frozen=True)
 class ServerMessageTurn(ServerMessage):
-    movements: NDArray[np.uintp]
+    movements: NDArray[np.int_]
 
 
 @final
 @dataclass(frozen=True)
 class ServerMessageMovement(ServerMessage):
     player: Player
-    movement: NDArray[np.uintp]
+    movement: NDArray[np.int_]
 
 
 @final
