@@ -142,8 +142,8 @@ class Client:
     def __init__(
         self,
         socket: str,
-        delay: float = 0.100,  # 100ms
-        attempts: int = 10,
+        delay: float = 0.500,  # 500ms
+        attempts: int = 20,
         buf_size: int = 1024,
     ):
         # Socket connection parameters
