@@ -76,6 +76,7 @@ class ServerMessageMovement(ServerMessage):
 @dataclass(frozen=True)
 class ServerMessageGameFinished(ServerMessage):
     winner: Player
+    turns: int
 
 
 def parse_message(message: dict[str, object]) -> ServerMessage:
@@ -103,7 +104,8 @@ def parse_message(message: dict[str, object]) -> ServerMessage:
 
         case "game_finished":
             return ServerMessageGameFinished(
-                winner=Player.from_str(str(message["winner"]))
+                winner=Player.from_str(str(message["winner"])),
+                turns=message["turns"],
             )
 
         case _:
