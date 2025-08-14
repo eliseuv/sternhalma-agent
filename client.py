@@ -113,29 +113,19 @@ def parse_message(message: dict[str, Any]) -> ServerMessage:
 
 
 # Client -> Server
+@dataclass(frozen=True)
 class ClientMessage(ABC):
-    @final
-    def to_dict(self) -> dict[str, Any]:
-        """Dictionary representation of the message to be serialized and sent to the server"""
-        return {"type": self.type_str} | vars(self)
+    """Client message abstract base dataclass
+    Every child client message must provide a `type: str` field."""
 
-    @property
-    @abstractmethod
-    def type_str(self) -> str:
-        """Property representing the string value for the 'type' entry of the message"""
-        pass
+    pass
 
 
 @final
 @dataclass(frozen=True)
 class ClientMessageChoice(ClientMessage):
-    type = "choice"
     movement: list[list[int]]
-
-    @property
-    @override
-    def type_str(self) -> str:
-        return "choice"
+    type: str = "choice"
 
 
 @final
@@ -244,7 +234,7 @@ class Client:
     async def send_message(self, message: ClientMessage):
         logging.debug(f"Sending message to server: {printer.pformat(message)}")
 
-        message_dict = message.to_dict()
+        message_dict = vars(message)
         logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
         message_bytes = cbor2.dumps(message_dict)
@@ -309,7 +299,7 @@ async def main():
                         movements
                     ).tolist()
                     logging.debug(f"Chosen movement: {movement}")
-                    await client.send_message(ClientMessageChoice(movement=movement))
+                    await client.send_message(ClientMessageChoice(movement))
 
                 case ServerMessageMovement(player, indices):
                     logging.debug(f"Player {player} made move {indices}")
