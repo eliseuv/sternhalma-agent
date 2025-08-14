@@ -151,8 +151,8 @@ class Board:
         self.state[tuple(idx)] = position
 
     def apply_movement(self, movement: Movement) -> None:
-        self.state[movement[1]] = self.state[tuple(movement[0])]
-        self.state[movement[0]] = Position.Empty
+        self[movement[1]] = self[movement[0]]
+        self[movement[0]] = Position.Empty
 
     def print(self):
         print(
