@@ -12,7 +12,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from sternhalma.board import Player
-from sternhalma.agent import Agent, AheadStrategy, BrownianStrategy
+from sternhalma.agent import AgentConstant
 
 
 # Set up logging configuration
@@ -286,10 +286,8 @@ async def main():
                     continue
 
         # Create game agent
-        agent = Agent(player, BrownianStrategy())
-        logging.info(
-            f"Created agent with strategy: {agent.strategy.__class__.__name__}"
-        )
+        agent = AgentConstant(player)
+        logging.info(f"Created agent: {agent.__class__.__name__}")
 
         # Game loop
         while True:
@@ -298,7 +296,9 @@ async def main():
             match message:
                 case ServerMessageTurn(movements):
                     logging.debug("It's my turn")
-                    movement = agent.decide_move(movements).tolist()
+                    movement: list[list[int]] = agent.decide_movement(
+                        movements
+                    ).tolist()
                     logging.debug(f"Chosen movement: {movement}")
                     await client.send_message(ClientMessageChoice(movement=movement))
 

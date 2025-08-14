@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import final, override
 
 import numpy as np
@@ -8,34 +9,39 @@ from .board import (
     PLAYER1_STARTING_POSITIONS,
     PLAYER2_STARTING_POSITIONS,
     Board,
+    Movement,
     Player,
 )
 
 
-class Strategy(ABC):
+class Agent(ABC):
+    def __init__(self, player: Player):
+        self.player: Player = player
+        self.board: Board = Board.two_players()
+
     @abstractmethod
-    def select_move(self, movements: NDArray[np.int_]) -> NDArray[np.int_]:
+    def decide_movement(self, movements: NDArray[np.int_]) -> Movement:
         pass
 
 
 @final
-class ConstantStrategy(Strategy):
+class AgentConstant(Agent):
     @override
-    def select_move(self, movements: NDArray[np.int_]) -> NDArray[np.int_]:
+    def decide_movement(self, movements: NDArray[np.int_]) -> Movement:
         return movements[0]
 
 
 @final
-class BrownianStrategy(Strategy):
+class AgentBrownian(Agent):
     @override
-    def select_move(self, movements: NDArray[np.int_]) -> NDArray[np.int_]:
+    def decide_movement(self, movements: NDArray[np.int_]) -> Movement:
         return movements[np.random.randint(0, len(movements))]
 
 
 @final
-class AheadStrategy(Strategy):
+class AgentTest(Agent):
     def __init__(self, player: Player):
-        self.player = player
+        super().__init__(player)
         match player:
             case Player.Player1:
                 self.goal = set(map(tuple, PLAYER2_STARTING_POSITIONS))
@@ -43,7 +49,7 @@ class AheadStrategy(Strategy):
                 self.goal = set(map(tuple, PLAYER1_STARTING_POSITIONS))
 
     @override
-    def select_move(self, movements: NDArray[np.int_]) -> int:
+    def decide_movement(self, movements: NDArray[np.int_]) -> Movement:
         pass
         # return sorted(
         #     filter(
@@ -60,14 +66,3 @@ class AheadStrategy(Strategy):
         #     key=lambda mv: np.linalg.norm(mv[1][0] - self.goal, axis=1).min(),
         #     reverse=True,
         # )[np.random.poisson(1)][0]
-
-
-@final
-class Agent:
-    def __init__(self, player: Player, strategy: Strategy):
-        self.player = player
-        self.strategy = strategy
-        self.board = Board.two_players()
-
-    def decide_move(self, movements: NDArray[np.int_]) -> NDArray[np.int_]:
-        return self.strategy.select_move(movements)
