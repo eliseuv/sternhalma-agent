@@ -19,6 +19,13 @@ class Strategy(ABC):
 
 
 @final
+class ConstantStrategy(Strategy):
+    @override
+    def select_move(self, movements: NDArray[np.int_]) -> NDArray[np.int_]:
+        return movements[0]
+
+
+@final
 class BrownianStrategy(Strategy):
     @override
     def select_move(self, movements: NDArray[np.int_]) -> NDArray[np.int_]:
