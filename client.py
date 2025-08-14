@@ -6,7 +6,7 @@ import cbor2
 from pprint import PrettyPrinter
 import struct
 import logging
-from typing import final, override
+from typing import Any, final, override
 
 import numpy as np
 from numpy.typing import NDArray
@@ -79,7 +79,7 @@ class ServerMessageGameFinished(ServerMessage):
     turns: int
 
 
-def parse_message(message: dict[str, object]) -> ServerMessage:
+def parse_message(message: dict[str, Any]) -> ServerMessage:
     match message.get("type"):
         case "assign":
             match message["player"]:
@@ -98,14 +98,14 @@ def parse_message(message: dict[str, object]) -> ServerMessage:
 
         case "movement":
             return ServerMessageMovement(
-                player=Player.from_str(str(message["player"])),
+                player=Player.from_str(message["player"]),
                 movement=np.array(message["movement"]),
             )
 
         case "game_finished":
             return ServerMessageGameFinished(
-                winner=Player.from_str(str(message["winner"])),
-                turns=message["turns"],
+                winner=Player.from_str(message["winner"]),
+                turns=int(message["turns"]),
             )
 
         case _:
@@ -115,7 +115,7 @@ def parse_message(message: dict[str, object]) -> ServerMessage:
 # Client -> Server
 class ClientMessage(ABC):
     @abstractmethod
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         pass
 
 
@@ -125,7 +125,7 @@ class ClientMessageChoice(ClientMessage):
     movement: NDArray[np.int_]
 
     @override
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> dict[str, Any]:
         return {"type": "choice", **vars(self)}
 
 
@@ -223,7 +223,7 @@ class Client:
                 raise
 
         # Decode message
-        message_dict: dict[str, object] = cbor2.loads(message_bytes)
+        message_dict: dict[str, Any] = cbor2.loads(message_bytes)
         logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
         # Parse message
