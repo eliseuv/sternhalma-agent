@@ -114,19 +114,28 @@ def parse_message(message: dict[str, Any]) -> ServerMessage:
 
 # Client -> Server
 class ClientMessage(ABC):
-    @abstractmethod
+    @final
     def to_dict(self) -> dict[str, Any]:
+        """Dictionary representation of the message to be serialized and sent to the server"""
+        return {"type": self.type_str} | vars(self)
+
+    @property
+    @abstractmethod
+    def type_str(self) -> str:
+        """Property representing the string value for the 'type' entry of the message"""
         pass
 
 
 @final
 @dataclass(frozen=True)
 class ClientMessageChoice(ClientMessage):
-    movement: NDArray[np.int_]
+    type = "choice"
+    movement: list[list[int]]
 
+    @property
     @override
-    def to_dict(self) -> dict[str, Any]:
-        return {"type": "choice", **vars(self)}
+    def type_str(self) -> str:
+        return "choice"
 
 
 @final
