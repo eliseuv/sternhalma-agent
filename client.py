@@ -209,7 +209,7 @@ class Client:
             else:
                 raise
 
-        length = int(struct.unpack(">I", length_bytes)[0])
+        length = int.from_bytes(length_bytes)
         logging.debug(f"Message length: {length} bytes")
 
         # Read the actual message payload
