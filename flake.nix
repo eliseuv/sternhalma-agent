@@ -1,6 +1,15 @@
 {
   description = "Python development environment with libraries";
 
+  nixConfig = {
+    extra-substituters = [
+      "https://cuda-maintainers.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
+    ];
+  };
+
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
@@ -35,7 +44,8 @@
               scipy
               # Machine Learning
               scikit-learn
-              pytorch
+              pytorch-bin
+
             ]
           ))
 
