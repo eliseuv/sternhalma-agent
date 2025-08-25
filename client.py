@@ -1,73 +1,67 @@
-from abc import ABC, abstractmethod
-import argparse
+from abc import ABC
 import asyncio
 from dataclasses import dataclass
 import cbor2
-from pprint import PrettyPrinter
 import struct
 import logging
-from typing import Any, final, override
+from typing import Any, final
 
 import numpy as np
 from numpy.typing import NDArray
 
-from sternhalma.board import Player
-from sternhalma.agent import AgentConstant
-
-
-# Set up logging configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format="[{asctime} {levelname}] {message}",
-    style="{",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-
-# Custom pretty printer for better readability of logs
-printer = PrettyPrinter(indent=4, width=80, compact=True, sort_dicts=False)
-
-# Set up command-line argument parser
-parser = argparse.ArgumentParser(
-    description="Sternhalma Agent Client",
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-)
-_ = parser.add_argument(
-    "--socket",
-    type=str,
-    help="Unix socket path",
-)
-
-# Parse command-line arguments
-args = parser.parse_args()
-logging.debug(f"Arguments: {printer.pformat(vars(args))}")
+from sternhalma import Player
+from utils import printer
 
 
 # Server -> Client
 class ServerMessage(ABC):
+    """Message from Server to Client"""
+
     pass
 
 
 @final
 @dataclass(frozen=True)
 class ServerMessageAssign(ServerMessage):
+    """Server assigns a player to client
+
+    Attributes:
+        player: Player the client was assign
+    """
+
     player: Player
 
 
 @final
 @dataclass(frozen=True)
 class ServerMessageDisconnect(ServerMessage):
+    """Server requests that the client disconnects"""
+
     pass
 
 
 @final
 @dataclass(frozen=True)
 class ServerMessageTurn(ServerMessage):
+    """Server informs the client the it is their turn to play
+
+    Attributes:
+        movements: Available moves on the board
+    """
+
     movements: NDArray[np.int_]
 
 
 @final
 @dataclass(frozen=True)
 class ServerMessageMovement(ServerMessage):
+    """Server informs that client that a movement was made on the board
+
+    Attributes:
+        player: Player that made the movement
+        movement: Movement made
+    """
+
     player: Player
     movement: NDArray[np.int_]
 
@@ -75,11 +69,29 @@ class ServerMessageMovement(ServerMessage):
 @final
 @dataclass(frozen=True)
 class ServerMessageGameFinished(ServerMessage):
+    """Server informs the client that the game has finished and its result
+
+    Attributes:
+        winner: Player that won the game
+        turns: Total number of turns played
+    """
+
     winner: Player
     turns: int
 
 
-def parse_message(message: dict[str, Any]) -> ServerMessage:
+def parse_server_message(message: dict[str, Any]) -> ServerMessage:
+    """Parse message received from the server from a dictionary to a `ServerMessage` type
+
+    Args:
+        message: Dictionary containing the message
+
+    Returns:
+        Parsed message
+
+    Raises:
+        ValueError: Invalid message type
+    """
     match message.get("type"):
         case "assign":
             match message["player"]:
@@ -115,8 +127,8 @@ def parse_message(message: dict[str, Any]) -> ServerMessage:
 # Client -> Server
 @dataclass(frozen=True)
 class ClientMessage(ABC):
-    """Client message abstract base dataclass
-    Every child client message must provide a `type: str` field."""
+    """Message from Client to Server
+    Every client message must provide a `type: str` field."""
 
     pass
 
@@ -124,6 +136,12 @@ class ClientMessage(ABC):
 @final
 @dataclass(frozen=True)
 class ClientMessageChoice(ClientMessage):
+    """Client has chosen a movement from the list of available ones
+
+    Attributes:
+        movement: Chosen movement
+    """
+
     movement: list[list[int]]
     type: str = "choice"
 
@@ -226,7 +244,7 @@ class Client:
         logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
         # Parse message
-        message = parse_message(message_dict)
+        message = parse_server_message(message_dict)
         logging.debug(f"Received message: {printer.pformat(message)}")
 
         return message
@@ -266,61 +284,15 @@ class Client:
                 f"Unable to send message after {self.attempts} attempts"
             )
 
+    async def assign_player(self) -> Player:
+        message = await self.receive_message()
 
-async def main():
-    async with Client(args.socket) as client:
-        # Wait for assignment message
-        while True:
-            message = await client.receive_message()
-            match message:
-                case ServerMessageAssign(player):
-                    logging.info(f"Assigned player {player}")
-                    player = player
-                    break
+        match message:
+            case ServerMessageAssign(player):
+                logging.info(f"Assigned player {player}")
+                player = player
+                return player
 
-                case _:
-                    logging.error(
-                        f"Invalid message received: {printer.pformat(message)}"
-                    )
-                    continue
-
-        # Create game agent
-        agent = AgentConstant(player)
-        logging.info(f"Created agent: {agent.__class__.__name__}")
-
-        # Game loop
-        while True:
-            message = await client.receive_message()
-
-            match message:
-                case ServerMessageTurn(movements):
-                    logging.debug("It's my turn")
-                    movement: list[list[int]] = agent.decide_movement(
-                        movements
-                    ).tolist()
-                    logging.debug(f"Chosen movement: {movement}")
-                    await client.send_message(ClientMessageChoice(movement))
-
-                case ServerMessageMovement(player, indices):
-                    logging.debug(f"Player {player} made move {indices}")
-                    agent.board.apply_movement(indices)
-                    # agent.board.print()
-
-                case ServerMessageGameFinished(winner):
-                    logging.info(f"Game finished! Winner: {winner}")
-                    # Break out of game loop
-                    break
-
-                case ServerMessageDisconnect():
-                    logging.info("Disconnection signal received")
-                    break
-
-                case _:
-                    logging.error(f"Invalid message received: {message}")
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logging.info("Client stopped by user.")
+            case _:
+                logging.error(f"Invalid message received: {printer.pformat(message)}")
+                raise ValueError(f"Invalid message received: {message}")
