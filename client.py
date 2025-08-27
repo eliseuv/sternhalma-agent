@@ -13,6 +13,39 @@ from sternhalma import Player
 from utils import printer
 
 
+# Game result
+class GameResult(ABC):
+    """Abstract class for the result of a game"""
+
+    pass
+
+
+@final
+@dataclass(frozen=True)
+class GameResultMaxTurns(GameResult):
+    """Game has reached its maximum number of turns
+
+    Attributes:
+        total_turns: Total number of turns played
+    """
+
+    total_turns: int
+
+
+@final
+@dataclass(frozen=True)
+class GameResultFinished(GameResult):
+    """The game has been played until completion
+
+    Attributes:
+        winner: Winner of the game
+        total_turns: Total number of turns played
+    """
+
+    winner: Player
+    total_turns: int
+
+
 # Server -> Client
 class ServerMessage(ABC):
     """Message from Server to Client"""
@@ -76,8 +109,7 @@ class ServerMessageGameFinished(ServerMessage):
         turns: Total number of turns played
     """
 
-    winner: Player
-    turns: int
+    result: GameResult
 
 
 def parse_server_message(message: dict[str, Any]) -> ServerMessage:
@@ -93,6 +125,7 @@ def parse_server_message(message: dict[str, Any]) -> ServerMessage:
         ValueError: Invalid message type
     """
     match message.get("type"):
+        # Player assignment message
         case "assign":
             match message["player"]:
                 case "1":
@@ -102,23 +135,38 @@ def parse_server_message(message: dict[str, Any]) -> ServerMessage:
                 case _:
                     raise ValueError("Invalid player")
 
+        # Disconnection request
         case "disconnect":
             return ServerMessageDisconnect()
 
+        # It's the player's turn
         case "turn":
             return ServerMessageTurn(movements=np.array(message["movements"]))
 
+        # Player made a movement
         case "movement":
             return ServerMessageMovement(
                 player=Player.from_str(message["player"]),
                 movement=np.array(message["movement"]),
             )
 
+        # Game has finished
         case "game_finished":
-            return ServerMessageGameFinished(
-                winner=Player.from_str(message["winner"]),
-                turns=int(message["turns"]),
-            )
+            result = message["result"]
+            match result["type"]:
+                # Maximum number of turns reached
+                case "max_turns":
+                    result = GameResultMaxTurns(total_turns=result["total_turns"])
+                # Game has a winner
+                case "finished":
+                    result = GameResultFinished(
+                        winner=result["winner"], total_turns=result["total_turns"]
+                    )
+                case _:
+                    raise ValueError(
+                        f"Unexpected game result type: {result.get('type')}"
+                    )
+            return ServerMessageGameFinished(result=result)
 
         case _:
             raise ValueError(f"Unexpected message type: {message.get('type')}")
@@ -290,7 +338,6 @@ class Client:
         match message:
             case ServerMessageAssign(player):
                 logging.info(f"Assigned player {player}")
-                player = player
                 return player
 
             case _:

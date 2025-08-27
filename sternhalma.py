@@ -139,10 +139,10 @@ class Board:
 
     @classmethod
     def two_players(cls) -> "Board":
-        state = Board.empty().state
-        state[PLAYER1_STARTING_POSITIONS] = Position.Player1
-        state[PLAYER2_STARTING_POSITIONS] = Position.Player2
-        return cls(state=state)
+        board = cls.empty()
+        board.state[PLAYER1_STARTING_POSITIONS] = Position.Player1
+        board.state[PLAYER2_STARTING_POSITIONS] = Position.Player2
+        return board
 
     def __getitem__(self, idx: BoardIndex) -> Position:
         return Position(self.state[tuple(idx)])
