@@ -1,9 +1,10 @@
 import argparse
 import asyncio
 import logging
+from unittest import result
 
-from agent import AgentBrownian
-from client import Client
+from agent import Agent, AgentBrownian
+from client import Client, GameResult, GameResultFinished, GameResultMaxTurns
 from utils import printer
 
 
@@ -37,6 +38,21 @@ _ = parser.add_argument(
 )
 
 
+async def play(agent: Agent, client: Client):
+    result = await agent.play(client)
+    match result:
+        case GameResultMaxTurns(total_turns):
+            logging.info(
+                f"The game has reached its maximum number of turns: {total_turns}"
+            )
+
+        case GameResultFinished(winner, total_turns):
+            logging.info(f"Game finshied! Winner {winner} after {total_turns} turns")
+
+        case GameResult():
+            pass
+
+
 async def main():
     # Parse command-line arguments
     args = parser.parse_args()
@@ -57,7 +73,7 @@ async def main():
             pass
 
         else:
-            await agent.play(client)
+            await play(agent, client)
 
 
 if __name__ == "__main__":
