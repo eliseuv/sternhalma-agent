@@ -1,7 +1,6 @@
 from abc import ABC
 import asyncio
 from dataclasses import dataclass
-import re
 import cbor2
 import struct
 import logging
@@ -12,6 +11,15 @@ from numpy.typing import NDArray
 
 from sternhalma import Player
 from utils import printer
+
+
+# Table of scores for each player
+type ScoreTable = dict[Player, int]
+
+
+def read_scores(scores: dict[str, int]) -> ScoreTable:
+    """Convert the keys in a dictionary of scores from strings to player types."""
+    return {Player.from_str(player_str): score for player_str, score in scores.items()}
 
 
 # Game result
@@ -32,7 +40,7 @@ class GameResultMaxTurns(GameResult):
     """
 
     total_turns: int
-    scores: dict[Player, int]
+    scores: ScoreTable
 
 
 @final
@@ -48,7 +56,7 @@ class GameResultFinished(GameResult):
 
     winner: Player
     total_turns: int
-    scores: dict[Player, int]
+    scores: ScoreTable
 
 
 # Server -> Client
@@ -158,20 +166,14 @@ def parse_server_message(message: dict[str, Any]) -> ServerMessage:
                     # TODO: Function that converts scores dict keys
                     result = GameResultMaxTurns(
                         total_turns=result["total_turns"],
-                        scores={
-                            Player.from_str(player_str): score
-                            for player_str, score in result["scores"].items()
-                        },
+                        scores=read_scores(result["scores"]),
                     )
                 # Game has a winner
                 case "finished":
                     result = GameResultFinished(
                         winner=result["winner"],
                         total_turns=result["total_turns"],
-                        scores={
-                            Player.from_str(player_str): score
-                            for player_str, score in result["scores"].items()
-                        },
+                        scores=read_scores(result["scores"]),
                     )
                 case _:
                     raise ValueError(
@@ -209,13 +211,13 @@ class ClientMessageChoice(ClientMessage):
 class Client:
     def __init__(
         self,
-        socket: str,
+        path: str,
         delay: float = 0.500,  # 500ms
         attempts: int = 20,
         buf_size: int = 1024,
     ):
         # Socket connection parameters
-        self.path = socket
+        self.path = path
 
         # Connection retry parameters
         self.delay = delay
