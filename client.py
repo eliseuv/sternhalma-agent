@@ -212,12 +212,15 @@ class Client:
     def __init__(
         self,
         path: str,
+        timeout: int = 30,
         delay: float = 0.500,  # 500ms
         attempts: int = 20,
         buf_size: int = 1024,
     ):
         # Socket connection parameters
         self.path = path
+
+        self.timeout = timeout
 
         # Connection retry parameters
         self.delay = delay
@@ -279,7 +282,9 @@ class Client:
 
         # Read the 4-byte length prefix
         try:
-            length_bytes = await self.reader.readexactly(4)
+            length_bytes = await asyncio.wait_for(
+                self.reader.readexactly(4), timeout=self.timeout
+            )
         except asyncio.IncompleteReadError as e:
             bytes_read = len(e.partial)
             if bytes_read == 0:
@@ -292,7 +297,9 @@ class Client:
 
         # Read the actual message payload
         try:
-            message_bytes = await self.reader.readexactly(length)
+            message_bytes = await asyncio.wait_for(
+                self.reader.readexactly(length), timeout=self.timeout
+            )
         except asyncio.IncompleteReadError as e:
             bytes_read = len(e.partial)
             if bytes_read == 0:
@@ -313,37 +320,26 @@ class Client:
     async def send_message(self, message: ClientMessage):
         logging.debug(f"Sending message to server: {printer.pformat(message)}")
 
+        # Message is serialized as a dictionary
         message_dict = vars(message)
         logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
+        # Binary message
         message_bytes = cbor2.dumps(message_dict)
 
+        # Calculate message length
         length: int = len(message_bytes)
         logging.debug(f"Message length: {length} bytes")
-
         length_bytes = struct.pack(">I", length)
 
-        for _ in range(self.attempts):
-            # Write the 4-byte length prefix and then the message payload
-            try:
-                self.writer.write(length_bytes)
-                self.writer.write(message_bytes)
-                # Ensure the data is actually sent
-                await self.writer.drain()
-            except (BrokenPipeError, ConnectionResetError, OSError) as e:
-                logging.error(f"Error writing message to stream: {e}")
-                continue  # Retry if it's a transient network error
-            except Exception as e:
-                logging.error(f"Unexpected error during message send: {e}")
-                raise  # Re-raise unexpected errors
+        # Write the 4-byte length prefix and then the message payload
+        self.writer.write(length_bytes)
+        self.writer.write(message_bytes)
 
-            logging.debug("Message successfully sent")
-            return  # Message sent successfully, exit loop
+        # Ensure the data is actually sent
+        await asyncio.wait_for(self.writer.drain(), timeout=self.timeout)
 
-        else:
-            raise ConnectionResetError(
-                f"Unable to send message after {self.attempts} attempts"
-            )
+        logging.debug("Message successfully sent")
 
     async def assign_player(self) -> Player:
         message = await self.receive_message()
