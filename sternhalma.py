@@ -14,9 +14,9 @@ class Player(IntEnum):
     @classmethod
     def from_str(cls, player_str: str) -> "Player":
         match player_str:
-            case "1":
+            case "player1":
                 return Player.Player1
-            case "2":
+            case "player2":
                 return Player.Player2
             case _:
                 raise ValueError(f"Unknown player string: {player_str}")
