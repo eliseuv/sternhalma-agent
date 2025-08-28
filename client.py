@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import cbor2
 import struct
 import logging
-from typing import Any, final
+from typing import Any, Self, final, override
 
 import numpy as np
 from numpy.typing import NDArray
@@ -26,7 +26,19 @@ def read_scores(scores: dict[str, int]) -> ScoreTable:
 class GameResult(ABC):
     """Abstract class for the result of a game"""
 
-    pass
+    @classmethod
+    def parse(cls, result: dict[str, Any]) -> "GameResult":
+        match result["type"]:
+            # Maximum number of turns reached
+            case "max_turns":
+                return GameResultMaxTurns.parse(result)
+
+            # Game has a winner
+            case "finished":
+                return GameResultFinished.parse(result)
+
+            case _:
+                raise ValueError(f"Unexpected game result type: {result.get('type')}")
 
 
 @final
@@ -41,6 +53,14 @@ class GameResultMaxTurns(GameResult):
 
     total_turns: int
     scores: ScoreTable
+
+    @override
+    @classmethod
+    def parse(cls, result: dict[str, Any]) -> "GameResult":
+        return cls(
+            total_turns=result["total_turns"],
+            scores=read_scores(result["scores"]),
+        )
 
 
 @final
@@ -58,12 +78,45 @@ class GameResultFinished(GameResult):
     total_turns: int
     scores: ScoreTable
 
+    @override
+    @classmethod
+    def parse(cls, result: dict[str, Any]) -> "GameResult":
+        return cls(
+            winner=result["winner"],
+            total_turns=result["total_turns"],
+            scores=read_scores(result["scores"]),
+        )
+
 
 # Server -> Client
 class ServerMessage(ABC):
     """Message from Server to Client"""
 
-    pass
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        match message.get("type"):
+            # Player assignment message
+            case "assign":
+                return ServerMessageAssign.parse(message)
+
+            # Disconnection request
+            case "disconnect":
+                return ServerMessageDisconnect.parse(message)
+
+            # It's the player's turn
+            case "turn":
+                return ServerMessageTurn.parse(message)
+
+            # Player made a movement
+            case "movement":
+                return ServerMessageMovement.parse(message)
+
+            # Game has finished
+            case "game_finished":
+                return ServerMessageGameFinished.parse(message)
+
+            case _:
+                raise ValueError(f"Unexpected message type: {message.get('type')}")
 
 
 @final
@@ -77,13 +130,21 @@ class ServerMessageAssign(ServerMessage):
 
     player: Player
 
+    @override
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        return cls(player=Player.from_str(message["player"]))
+
 
 @final
 @dataclass(frozen=True)
 class ServerMessageDisconnect(ServerMessage):
     """Server requests that the client disconnects"""
 
-    pass
+    @override
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        return cls()
 
 
 @final
@@ -96,6 +157,11 @@ class ServerMessageTurn(ServerMessage):
     """
 
     movements: NDArray[np.int_]
+
+    @override
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        return cls(movements=np.array(message["movements"]))
 
 
 @final
@@ -111,6 +177,14 @@ class ServerMessageMovement(ServerMessage):
     player: Player
     movement: NDArray[np.int_]
 
+    @override
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        return cls(
+            player=Player.from_str(message["player"]),
+            movement=np.array(message["movement"]),
+        )
+
 
 @final
 @dataclass(frozen=True)
@@ -124,65 +198,10 @@ class ServerMessageGameFinished(ServerMessage):
 
     result: GameResult
 
-
-def parse_server_message(message: dict[str, Any]) -> ServerMessage:
-    """Parse message received from the server from a dictionary to a `ServerMessage` type
-
-    Args:
-        message: Dictionary containing the message
-
-    Returns:
-        Parsed message
-
-    Raises:
-        ValueError: Invalid message type
-    """
-    match message.get("type"):
-        # Player assignment message
-        case "assign":
-            return ServerMessageAssign(player=Player.from_str(message["player"]))
-
-        # Disconnection request
-        case "disconnect":
-            return ServerMessageDisconnect()
-
-        # It's the player's turn
-        case "turn":
-            return ServerMessageTurn(movements=np.array(message["movements"]))
-
-        # Player made a movement
-        case "movement":
-            return ServerMessageMovement(
-                player=Player.from_str(message["player"]),
-                movement=np.array(message["movement"]),
-            )
-
-        # Game has finished
-        case "game_finished":
-            result = message["result"]
-            match result["type"]:
-                # Maximum number of turns reached
-                case "max_turns":
-                    # TODO: Function that converts scores dict keys
-                    result = GameResultMaxTurns(
-                        total_turns=result["total_turns"],
-                        scores=read_scores(result["scores"]),
-                    )
-                # Game has a winner
-                case "finished":
-                    result = GameResultFinished(
-                        winner=result["winner"],
-                        total_turns=result["total_turns"],
-                        scores=read_scores(result["scores"]),
-                    )
-                case _:
-                    raise ValueError(
-                        f"Unexpected game result type: {result.get('type')}"
-                    )
-            return ServerMessageGameFinished(result=result)
-
-        case _:
-            raise ValueError(f"Unexpected message type: {message.get('type')}")
+    @override
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        return cls(result=GameResult.parse(message["result"]))
 
 
 # Client -> Server
@@ -312,7 +331,7 @@ class Client:
         logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
         # Parse message
-        message = parse_server_message(message_dict)
+        message = ServerMessage.parse(message_dict)
         logging.debug(f"Received message: {printer.pformat(message)}")
 
         return message
