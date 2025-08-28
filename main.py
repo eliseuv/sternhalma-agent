@@ -10,7 +10,7 @@ from utils import printer
 
 # Set up logging configuration
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="[{asctime} {levelname}] {message}",
     style="{",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -41,9 +41,9 @@ _ = parser.add_argument(
 async def play(agent: Agent, client: Client):
     result = await agent.play(client)
     match result:
-        case GameResultMaxTurns(total_turns):
+        case GameResultMaxTurns(total_turns, scores):
             logging.info(
-                f"The game has reached its maximum number of turns: {total_turns}"
+                f"The game has reached its maximum number of turns {total_turns} with scores {scores}"
             )
 
         case GameResultFinished(winner, total_turns):

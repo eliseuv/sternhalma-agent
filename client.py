@@ -1,6 +1,7 @@
 from abc import ABC
 import asyncio
 from dataclasses import dataclass
+import re
 import cbor2
 import struct
 import logging
@@ -27,9 +28,11 @@ class GameResultMaxTurns(GameResult):
 
     Attributes:
         total_turns: Total number of turns played
+        scores: Dictionary containing the scores of all players
     """
 
     total_turns: int
+    scores: dict[Player, int]
 
 
 @final
@@ -40,10 +43,12 @@ class GameResultFinished(GameResult):
     Attributes:
         winner: Winner of the game
         total_turns: Total number of turns played
+        scores: Dictionary containing the scores of all players
     """
 
     winner: Player
     total_turns: int
+    scores: dict[Player, int]
 
 
 # Server -> Client
@@ -150,11 +155,23 @@ def parse_server_message(message: dict[str, Any]) -> ServerMessage:
             match result["type"]:
                 # Maximum number of turns reached
                 case "max_turns":
-                    result = GameResultMaxTurns(total_turns=result["total_turns"])
+                    # TODO: Function that converts scores dict keys
+                    result = GameResultMaxTurns(
+                        total_turns=result["total_turns"],
+                        scores={
+                            Player.from_str(player_str): score
+                            for player_str, score in result["scores"].items()
+                        },
+                    )
                 # Game has a winner
                 case "finished":
                     result = GameResultFinished(
-                        winner=result["winner"], total_turns=result["total_turns"]
+                        winner=result["winner"],
+                        total_turns=result["total_turns"],
+                        scores={
+                            Player.from_str(player_str): score
+                            for player_str, score in result["scores"].items()
+                        },
                     )
                 case _:
                     raise ValueError(
