@@ -127,13 +127,7 @@ def parse_server_message(message: dict[str, Any]) -> ServerMessage:
     match message.get("type"):
         # Player assignment message
         case "assign":
-            match message["player"]:
-                case "1":
-                    return ServerMessageAssign(player=Player.Player1)
-                case "2":
-                    return ServerMessageAssign(player=Player.Player2)
-                case _:
-                    raise ValueError("Invalid player")
+            return ServerMessageAssign(player=Player.from_str(message["player"]))
 
         # Disconnection request
         case "disconnect":
