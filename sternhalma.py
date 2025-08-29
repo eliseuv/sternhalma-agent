@@ -1,3 +1,8 @@
+"""[TODO:description]
+
+[TODO:description]
+"""
+
 from dataclasses import dataclass
 from enum import IntEnum
 from types import FunctionType
@@ -166,6 +171,12 @@ class Board:
         )
 
 
+# Scores of each player
+type Scores = tuple[int, int]
+
+
 @dataclass(frozen=True)
 class GameResult:
     winner: Player
+    total_turns: int
+    scores: Scores
