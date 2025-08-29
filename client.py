@@ -167,6 +167,7 @@ class ServerMessageMovement(ServerMessage):
 
     player: Player
     movement: NDArray[np.int_]
+    scores: tuple[int, int]
 
     @override
     @classmethod
@@ -174,6 +175,7 @@ class ServerMessageMovement(ServerMessage):
         return cls(
             player=Player.from_str(message["player"]),
             movement=np.array(message["movement"]),
+            scores=message["scores"],
         )
 
 
