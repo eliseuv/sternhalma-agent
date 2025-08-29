@@ -13,12 +13,6 @@ from sternhalma import Player
 from utils import printer
 
 
-# Parse scores dictionary keys
-def parse_scores(scores: dict[str, int]) -> dict[Player, int]:
-    """Convert the keys in a dictionary of scores from strings to player types."""
-    return {Player.from_str(player_str): score for player_str, score in scores.items()}
-
-
 # Game result
 class GameResult(ABC):
     """Abstract class for the result of a game"""
@@ -49,14 +43,14 @@ class GameResultMaxTurns(GameResult):
     """
 
     total_turns: int
-    scores: dict[Player, int]
+    scores: tuple[int, int]
 
     @override
     @classmethod
     def parse(cls, result: dict[str, Any]) -> "GameResult":
         return cls(
             total_turns=result["total_turns"],
-            scores=parse_scores(result["scores"]),
+            scores=result["scores"],
         )
 
 
@@ -73,7 +67,7 @@ class GameResultFinished(GameResult):
 
     winner: Player
     total_turns: int
-    scores: dict[Player, int]
+    scores: tuple[int, int]
 
     @override
     @classmethod
@@ -81,7 +75,7 @@ class GameResultFinished(GameResult):
         return cls(
             winner=result["winner"],
             total_turns=result["total_turns"],
-            scores=parse_scores(result["scores"]),
+            scores=result["scores"],
         )
 
 
