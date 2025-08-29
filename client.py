@@ -9,7 +9,7 @@ from typing import Any, final, override
 import numpy as np
 from numpy.typing import NDArray
 
-from sternhalma import Player
+from sternhalma import Player, Scores
 from utils import printer
 
 
@@ -43,7 +43,7 @@ class GameResultMaxTurns(GameResult):
     """
 
     total_turns: int
-    scores: tuple[int, int]
+    scores: Scores
 
     @override
     @classmethod
@@ -67,7 +67,7 @@ class GameResultFinished(GameResult):
 
     winner: Player
     total_turns: int
-    scores: tuple[int, int]
+    scores: Scores
 
     @override
     @classmethod
@@ -167,7 +167,7 @@ class ServerMessageMovement(ServerMessage):
 
     player: Player
     movement: NDArray[np.int_]
-    scores: tuple[int, int]
+    scores: Scores
 
     @override
     @classmethod
