@@ -52,7 +52,6 @@
               # Machine Learning
               scikit-learn
               pytorch-bin
-
             ]
           ))
 
