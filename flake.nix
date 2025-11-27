@@ -58,7 +58,7 @@
                 scipy
                 # Machine Learning
                 scikit-learn
-                pytorch-bin
+                torch-bin
               ]
             ))
 
