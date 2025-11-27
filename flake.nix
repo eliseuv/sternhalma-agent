@@ -45,6 +45,9 @@
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
 
+            ruff
+            basedpyright
+
             # Python
             (python3.withPackages (
               pypkgs: with pypkgs; [
