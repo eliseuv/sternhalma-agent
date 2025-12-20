@@ -42,21 +42,6 @@
           };
         };
 
-        # Python environment with packages
-        pythonEnv = pkgs.python3.withPackages (
-          pypkgs: with pypkgs; [
-            # CBOR
-            cbor2
-            # Numerical
-            numpy
-            scipy
-            # Machine Learning
-            scikit-learn
-            torch-bin
-            gymnasium
-          ]
-        );
-
         # Python script to test PyTorch CUDA support
         testTorchCudaScript = pkgs.writeText ".test_torch_cuda.py" ''
           import torch
@@ -67,19 +52,27 @@
 
       in
       {
+        # Python environment with packages
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
+            uv
+            python3
 
             ruff
             basedpyright
-
-            # Python
-            pythonEnv
-
           ];
 
           shellHook = ''
-            ln -snf ${pythonEnv} .venv
+            export LD_LIBRARY_PATH=/run/opengl-driver/lib:${
+              pkgs.lib.makeLibraryPath [
+                pkgs.stdenv.cc.cc.lib
+                pkgs.zlib
+                # Add other libraries if needed, e.g. glib, libGL
+              ]
+            }:$LD_LIBRARY_PATH
+            export UV_PYTHON_DOWNLOADS=never
+            uv sync
+            source .venv/bin/activate
             python ${testTorchCudaScript}
           '';
 
