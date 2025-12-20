@@ -73,7 +73,7 @@ class GameResultFinished(GameResult):
     @classmethod
     def parse(cls, result: dict[str, Any]) -> "GameResult":
         return cls(
-            winner=result["winner"],
+            winner=Player.from_str(result["winner"]),
             total_turns=result["total_turns"],
             scores=result["scores"],
         )
@@ -86,6 +86,14 @@ class ServerMessage(ABC):
     @classmethod
     def parse(cls, message: dict[str, Any]) -> "ServerMessage":
         match message.get("type"):
+            # Server welcomes the client
+            case "welcome":
+                return ServerMessageWelcome.parse(message)
+
+            # Server rejects the client
+            case "reject":
+                return ServerMessageReject.parse(message)
+
             # Player assignment message
             case "assign":
                 return ServerMessageAssign.parse(message)
@@ -181,6 +189,45 @@ class ServerMessageMovement(ServerMessage):
 
 @final
 @dataclass(frozen=True)
+class ServerMessageWelcome(ServerMessage):
+    """Server welcomes the client and assigns a session ID and player
+
+    Attributes:
+        session_id: Unique session identifier
+        player: Player assigned to the client
+    """
+
+    session_id: str
+    player: Player
+
+    @override
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        return cls(
+            session_id=message["session_id"],
+            player=Player.from_str(message["player"]),
+        )
+
+
+@final
+@dataclass(frozen=True)
+class ServerMessageReject(ServerMessage):
+    """Server rejects the connection
+
+    Attributes:
+        reason: Reason for rejection
+    """
+
+    reason: str
+
+    @override
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        return cls(reason=message["reason"])
+
+
+@final
+@dataclass(frozen=True)
 class ServerMessageGameFinished(ServerMessage):
     """Server informs the client that the game has finished and its result
 
@@ -208,14 +255,35 @@ class ClientMessage(ABC):
 
 @final
 @dataclass(frozen=True)
-class ClientMessageChoice(ClientMessage):
-    """Client has chosen a movement from the list of available ones
+class ClientMessageHello(ClientMessage):
+    """Client initiates a new session"""
+
+    type: str = "hello"
+
+
+@final
+@dataclass(frozen=True)
+class ClientMessageReconnect(ClientMessage):
+    """Client requests to reconnect to an existing session
 
     Attributes:
-        movement: Chosen movement
+        session_id: Session ID to reconnect to
     """
 
-    movement: list[list[int]]
+    session_id: str
+    type: str = "reconnect"
+
+
+@final
+@dataclass(frozen=True)
+class ClientMessageChoice(ClientMessage):
+    """Client has chosen a movement index from the list of available ones
+
+    Attributes:
+        movement_index: Index of the chosen movement
+    """
+
+    movement_index: int
     type: str = "choice"
 
 
@@ -223,14 +291,16 @@ class ClientMessageChoice(ClientMessage):
 class Client:
     def __init__(
         self,
-        path: str,
+        host: str = "127.0.0.1",
+        port: int = 8080,
         timeout: int = 30,
         delay: float = 0.500,  # 500ms
         attempts: int = 20,
         buf_size: int = 1024,
     ):
         # Socket connection parameters
-        self.path = path
+        self.host = host
+        self.port = port
 
         self.timeout = timeout
 
@@ -243,23 +313,21 @@ class Client:
         self.writer: asyncio.StreamWriter = None  # pyright: ignore [reportAttributeAccessIssue]
 
     async def __aenter__(self):
-        logging.info(f"Connecting to server at {self.path}")
+        logging.info(f"Connecting to server at {self.host}:{self.port}")
         for attempt in range(self.attempts):
             try:
-                self.reader, self.writer = await asyncio.open_unix_connection(self.path)
+                self.reader, self.writer = await asyncio.open_connection(
+                    self.host, self.port
+                )
                 logging.info("Connection established successfully")
+                
+                # Send Hello immediately after connection
+                await self.send_message(ClientMessageHello())
+                
                 return self
 
-            # If the socket file is not found, log the error, wait and retry
-            except FileNotFoundError:
-                logging.error(
-                    f"Socket file not found. Retrying {attempt + 1}/{self.attempts}"
-                )
-                await asyncio.sleep(self.delay)
-                continue
-
-            # If the connection is refused, log the error, wait and retry
-            except ConnectionRefusedError:
+            # If the connection fails, log the error, wait and retry
+            except (ConnectionRefusedError, OSError):
                 logging.error(
                     f"Connection refused. Retrying {attempt + 1}/{self.attempts}"
                 )
@@ -354,13 +422,20 @@ class Client:
         logging.debug("Message successfully sent")
 
     async def assign_player(self) -> Player:
+        # Wait for Welcome message first
         message = await self.receive_message()
-
         match message:
-            case ServerMessageAssign(player):
-                logging.info(f"Assigned player {player}")
+            case ServerMessageWelcome(session_id, player):
+                logging.info(f"Welcome! Session ID: {session_id}, Assigned player: {player}")
                 return player
-
+                
+            case ServerMessageReject(reason):
+                logging.error(f"Connection rejected: {reason}")
+                raise ConnectionRefusedError(f"Server rejected connection: {reason}")
+                
             case _:
-                logging.error(f"Invalid message received: {printer.pformat(message)}")
-                raise ValueError(f"Invalid message received: {message}")
+                # If we get an Assign message, it might be a reconnect scenario or protocol slight variation,
+                # but per spec Hello -> Welcome. Let's handle Assign if it comes instead/after.
+                # Actually, spec says Welcome has player.
+                logging.error(f"Expected Welcome message, got: {printer.pformat(message)}")
+                raise ValueError(f"Unexpected message during handshake: {message}")
