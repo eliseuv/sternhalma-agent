@@ -5,7 +5,6 @@ It includes definitions for the board, players, valid positions, and metrics for
 on the hexagonal grid.
 """
 
-import torch as T
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import final, override
@@ -247,22 +246,6 @@ class Board:
                 enumerate(self.state),
             )
         )
-
-    def to_tensor(self) -> T.Tensor:
-        """
-        Converts the board state to a PyTorch tensor for neural network input.
-
-        Returns:
-            A tensor of shape (3, 17, 17):
-            - Channel 0: 1 where Player 1 has a piece, 0 otherwise
-            - Channel 1: 1 where Player 2 has a piece, 0 otherwise
-            - Channel 2: Mask of valid board positions (1 for valid, 0 for invalid)
-        """
-        tensor = np.zeros((3, 17, 17), dtype=np.float32)
-        tensor[0] = self.state == Position.Player1
-        tensor[1] = self.state == Position.Player2
-        tensor[2] = BOARD_MASK
-        return T.tensor(tensor)
 
 
 # Scores of each player
