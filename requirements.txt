@@ -1,5 +1,0 @@
-cbor2
-numpy
-scipy
-scikit-learn
-torch

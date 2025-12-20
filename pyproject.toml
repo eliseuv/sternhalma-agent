@@ -1,0 +1,7 @@
+[project]
+name = "sternhalma-agent"
+version = "0.1.0"
+description = "Sternhalma agent"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["cbor2", "numpy", "scipy", "scikit-learn", "torch", "gymnasium"]
