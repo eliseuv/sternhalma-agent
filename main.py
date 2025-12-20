@@ -24,10 +24,16 @@ parser = argparse.ArgumentParser(
 )
 # Game server socket
 _ = parser.add_argument(
-    "--socket",
+    "--host",
     type=str,
-    required=True,
-    help="Game server socket path",
+    default="127.0.0.1",
+    help="Game server host",
+)
+_ = parser.add_argument(
+    "--port",
+    type=int,
+    default=8080,
+    help="Game server port",
 )
 # Agent mode
 _ = parser.add_argument(
@@ -57,11 +63,13 @@ async def main():
     # Parse command-line arguments
     args = parser.parse_args()
     logging.debug(f"Arguments: {printer.pformat(vars(args))}")
-    socket = str(args.socket)
+    logging.debug(f"Arguments: {printer.pformat(vars(args))}")
+    host = str(args.host)
+    port = int(args.port)
     training_mode = bool(args.training_mode)
 
     # Connect to server
-    async with Client(socket) as client:
+    async with Client(host, port) as client:
         # Wait for player assignment from server
         player = await client.assign_player()
 

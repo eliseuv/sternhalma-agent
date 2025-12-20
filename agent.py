@@ -36,9 +36,9 @@ class Agent(ABC):
             match await client.receive_message():
                 case ServerMessageTurn(movements):
                     logging.debug("It's my turn")
-                    movement: list[list[int]] = self.decide_movement(movements).tolist()
-                    logging.debug(f"Chosen movement: {movement}")
-                    await client.send_message(ClientMessageChoice(movement))
+                    movement_index: int = self.decide_movement(movements)
+                    logging.debug(f"Chosen movement index: {movement_index}")
+                    await client.send_message(ClientMessageChoice(movement_index))
 
                 case ServerMessageMovement(player, indices):
                     logging.debug(f"Player {player} made move {indices}")
@@ -59,22 +59,22 @@ class Agent(ABC):
         self.nn: None = None
 
     @abstractmethod
-    def decide_movement(self, movements: NDArray[np.int_]) -> Movement:
+    def decide_movement(self, movements: NDArray[np.int_]) -> int:
         pass
 
 
 @final
 class AgentConstant(Agent):
     @override
-    def decide_movement(self, movements: NDArray[np.int_]) -> Movement:
-        return movements[0]
+    def decide_movement(self, movements: NDArray[np.int_]) -> int:
+        return 0
 
 
 @final
 class AgentBrownian(Agent):
     @override
-    def decide_movement(self, movements: NDArray[np.int_]) -> Movement:
-        return movements[np.random.randint(0, len(movements))]
+    def decide_movement(self, movements: NDArray[np.int_]) -> int:
+        return np.random.randint(0, len(movements))
 
 
 @final
@@ -88,5 +88,5 @@ class AgentDQN(Agent):
         self.nn = None
 
     @override
-    def decide_movement(self, movements: NDArray[np.int_]) -> Movement:
-        pass
+    def decide_movement(self, movements: NDArray[np.int_]) -> int:
+        return 0
