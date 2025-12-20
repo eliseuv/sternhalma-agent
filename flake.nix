@@ -53,6 +53,7 @@
             # Machine Learning
             scikit-learn
             torch-bin
+            gymnasium
           ]
         );
 
