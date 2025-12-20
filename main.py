@@ -4,7 +4,8 @@ import logging
 
 
 from agent import Agent, AgentBrownian
-from client import Client, GameResult, GameResultFinished, GameResultMaxTurns
+from client import Client
+from protocol import GameResult, GameResultFinished, GameResultMaxTurns
 from utils import printer
 
 

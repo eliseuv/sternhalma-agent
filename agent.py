@@ -5,8 +5,8 @@ from typing import final, override
 import numpy as np
 from numpy.typing import NDArray
 
-from client import (
-    Client,
+from client import Client
+from protocol import (
     ClientMessageChoice,
     GameResult,
     ServerMessage,
