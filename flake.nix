@@ -42,6 +42,20 @@
           };
         };
 
+        # Python environment with packages
+        pythonEnv = pkgs.python3.withPackages (
+          pypkgs: with pypkgs; [
+            # CBOR
+            cbor2
+            # Numerical
+            numpy
+            scipy
+            # Machine Learning
+            scikit-learn
+            torch-bin
+          ]
+        );
+
         # Python script to test PyTorch CUDA support
         testTorchCudaScript = pkgs.writeText ".test_torch_cuda.py" ''
           import torch
@@ -59,22 +73,12 @@
             basedpyright
 
             # Python
-            (python3.withPackages (
-              pypkgs: with pypkgs; [
-                # CBOR
-                cbor2
-                # Numerical
-                numpy
-                scipy
-                # Machine Learning
-                scikit-learn
-                torch-bin
-              ]
-            ))
+            pythonEnv
 
           ];
 
           shellHook = ''
+            ln -snf ${pythonEnv} .venv
             python ${testTorchCudaScript}
           '';
 
