@@ -1,7 +1,4 @@
-"""[TODO:description]
-
-[TODO:description]
-"""
+"""Sternhalma game module containing board, player, and logic definitions."""
 
 from dataclasses import dataclass
 from enum import IntEnum
@@ -13,6 +10,10 @@ from numpy.typing import ArrayLike, NDArray
 
 
 class Player(IntEnum):
+    """
+    Player 1 is the player that starts the game
+    """
+
     Player1 = 1
     Player2 = 2
 
@@ -159,14 +160,11 @@ class Board:
         self[movement[1]] = self[movement[0]]
         self[movement[0]] = Position.Empty
 
-    def print(self):
-        print(
-            "\n".join(
-                map(
-                    lambda e: " " * e[0]
-                    + "".join(map(lambda x: str(Position(x)), e[1])),
-                    enumerate(self.state),
-                )
+    def to_string(self) -> str:
+        return "\n".join(
+            map(
+                lambda e: " " * e[0] + "".join(map(lambda x: str(Position(x)), e[1])),
+                enumerate(self.state),
             )
         )
 

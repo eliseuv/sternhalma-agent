@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 import logging
-from unittest import result
+
 
 from agent import Agent, AgentBrownian
 from client import Client, GameResult, GameResultFinished, GameResultMaxTurns
@@ -53,7 +53,7 @@ async def play(agent: Agent, client: Client):
             )
 
         case GameResultFinished(winner, total_turns):
-            logging.info(f"Game finshied! Winner {winner} after {total_turns} turns")
+            logging.info(f"Game finished! Winner {winner} after {total_turns} turns")
 
         case GameResult():
             pass
@@ -63,7 +63,7 @@ async def main():
     # Parse command-line arguments
     args = parser.parse_args()
     logging.debug(f"Arguments: {printer.pformat(vars(args))}")
-    logging.debug(f"Arguments: {printer.pformat(vars(args))}")
+
     host = str(args.host)
     port = int(args.port)
     training_mode = bool(args.training_mode)

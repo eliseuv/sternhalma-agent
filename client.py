@@ -309,8 +309,8 @@ class Client:
         self.attempts = attempts
 
         # Stream reader and writer
-        self.reader: asyncio.StreamReader = None  # pyright: ignore [reportAttributeAccessIssue]
-        self.writer: asyncio.StreamWriter = None  # pyright: ignore [reportAttributeAccessIssue]
+        self.reader: asyncio.StreamReader | None = None
+        self.writer: asyncio.StreamWriter | None = None
 
     async def __aenter__(self):
         logging.info(f"Connecting to server at {self.host}:{self.port}")
@@ -320,10 +320,10 @@ class Client:
                     self.host, self.port
                 )
                 logging.info("Connection established successfully")
-                
+
                 # Send Hello immediately after connection
                 await self.send_message(ClientMessageHello())
-                
+
                 return self
 
             # If the connection fails, log the error, wait and retry
@@ -360,6 +360,9 @@ class Client:
     async def receive_message(self) -> ServerMessage:
         logging.debug("Waiting for server...")
 
+        if self.reader is None:
+            raise ConnectionError("Client not connected")
+
         # Read the 4-byte length prefix
         try:
             length_bytes = await asyncio.wait_for(
@@ -389,20 +392,27 @@ class Client:
 
         # Decode message
         message_dict: dict[str, Any] = cbor2.loads(message_bytes)
-        logging.debug(f"Message dict: {printer.pformat(message_dict)}")
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
         # Parse message
         message = ServerMessage.parse(message_dict)
-        logging.debug(f"Received message: {printer.pformat(message)}")
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug(f"Received message: {printer.pformat(message)}")
 
         return message
 
     async def send_message(self, message: ClientMessage):
-        logging.debug(f"Sending message to server: {printer.pformat(message)}")
+        if self.writer is None:
+            raise ConnectionError("Client not connected")
+
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug(f"Sending message to server: {printer.pformat(message)}")
 
         # Message is serialized as a dictionary
         message_dict = vars(message)
-        logging.debug(f"Message dict: {printer.pformat(message_dict)}")
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug(f"Message dict: {printer.pformat(message_dict)}")
 
         # Binary message
         message_bytes = cbor2.dumps(message_dict)
@@ -426,16 +436,21 @@ class Client:
         message = await self.receive_message()
         match message:
             case ServerMessageWelcome(session_id, player):
-                logging.info(f"Welcome! Session ID: {session_id}, Assigned player: {player}")
+                logging.info(
+                    f"Welcome! Session ID: {session_id}, Assigned player: {player}"
+                )
                 return player
-                
+
             case ServerMessageReject(reason):
                 logging.error(f"Connection rejected: {reason}")
                 raise ConnectionRefusedError(f"Server rejected connection: {reason}")
-                
+
             case _:
                 # If we get an Assign message, it might be a reconnect scenario or protocol slight variation,
                 # but per spec Hello -> Welcome. Let's handle Assign if it comes instead/after.
                 # Actually, spec says Welcome has player.
-                logging.error(f"Expected Welcome message, got: {printer.pformat(message)}")
+                if logging.getLogger().isEnabledFor(logging.ERROR):
+                    logging.error(
+                        f"Expected Welcome message, got: {printer.pformat(message)}"
+                    )
                 raise ValueError(f"Unexpected message during handshake: {message}")
