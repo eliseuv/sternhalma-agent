@@ -1,17 +1,25 @@
-"""Sternhalma game module containing board, player, and logic definitions."""
+"""Sternhalma game module containing board, player, and logic definitions.
 
+This module defines the core data structures and logic for the Sternhalma (Chinese Checkers) game.
+It includes definitions for the board, players, valid positions, and metrics for calculating distances
+on the hexagonal grid.
+"""
+
+import torch as T
 from dataclasses import dataclass
 from enum import IntEnum
-from types import FunctionType
 from typing import final, override
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
 
 class Player(IntEnum):
     """
-    Player 1 is the player that starts the game
+    Represents the two players in the game.
+
+    Player 1 is the starting player (Blue, 🔵).
+    Player 2 is the second player (Red, 🔴).
     """
 
     Player1 = 1
@@ -37,30 +45,75 @@ class Player(IntEnum):
 
 
 # Axial index in the hexagonal board
-# Array of shape (2,)
+# The board uses a 2D coordinate system (q, r) where q is the column and r is the row (or derived axis).
+# Array of shape (2,) representing [q, r]
+# See https://www.redblobgames.com/grids/hexagons/ for hexagonal grid coordinate systems.
 type BoardIndex = NDArray[np.int_]
 
 
 # How many steps it takes to get from one cell to another
 def hexagonal_metric(d: BoardIndex) -> np.int_:
+    """
+    Calculates the hexagonal distance metric (Manhattan distance on hex grid) from the origin.
+
+    Args:
+        d: The difference vector in axial coordinates.
+
+    Returns:
+        The number of steps to reach the destination from the origin.
+    """
     return np.max(np.abs([d[0], d[1], d[0] + d[1]]))
 
 
 def hexagonal_distance(i: BoardIndex, j: BoardIndex) -> np.int_:
+    """
+    Calculates the number of steps (distance) between two hexagonal coordinates.
+
+    Args:
+        i: The starting coordinate.
+        j: The ending coordinate.
+
+    Returns:
+        The integer distance between i and j.
+    """
     return hexagonal_metric(j - i)
 
 
 # Euclidean metric on the hexagonal grid
 def euclidean_metric(d: BoardIndex) -> np.float64:
+    """
+    Calculates the Euclidean distance from the origin in the hexagonal grid embedding.
+
+    This accounts for the geometry of the hexagons where axes are at 60 degrees.
+    Based on the formula: distance = sqrt(x^2 + y^2 + xy) for axial coordinates (if axes are 120 deg apart).
+    Here implemented as sqrt((q+r)^2 - qr) which is equivalent to standard Euclidean distance on 60-degree basis.
+
+    Args:
+        d: The difference vector.
+
+    Returns:
+        The Euclidean distance.
+    """
     return np.sqrt(np.square(d[0] + d[1]) - (d[0] * d[1]))
 
 
 def euclidean_distance(i: BoardIndex, j: BoardIndex) -> np.float64:
+    """
+    Calculates the Euclidean distance between two coordinates.
+
+    Args:
+        i: The starting coordinate.
+        j: The ending coordinate.
+
+    Returns:
+        The Euclidean distance.
+    """
     return euclidean_metric(j - i)
 
 
 # Valid positions on the board
-# Stored as tuple of
+# Defined as hardcoded axial coordinates for the standard Sternhalma star-shaped board.
+# Stored as tuple of 2 arrays (q_indices, r_indices) for easy indexing.
 VALID_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np.transpose([
                                            [0,12],
                                        [1,11],[1,12],
@@ -81,7 +134,8 @@ VALID_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np.transpose(
                                           [16,4],
 ]))  # fmt: skip
 
-# Starting positions of player 1
+# Starting positions of player 1 (Bottom triangle)
+# These are the target positions for Player 2.
 PLAYER1_STARTING_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np.transpose([
 [12,4],[12,5],[12,6],[12,7],[12,8],
     [13,4],[13,5],[13,6],[13,7],
@@ -90,7 +144,8 @@ PLAYER1_STARTING_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np
               [16,4],
 ]))  # fmt: skip
 
-# Starting positions of player 2
+# Starting positions of player 2 (Top triangle)
+# These are the target positions for Player 1.
 PLAYER2_STARTING_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np.transpose([
             [0,12],
         [1,11],[1,12],
@@ -99,12 +154,20 @@ PLAYER2_STARTING_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np
 [4,8],[4,9],[4,10],[4,11],[4,12],
 ]))  # fmt: skip
 
+# Board mask to filter out invalid positions
+BOARD_MASK = np.zeros((17, 17), dtype=np.float32)
+BOARD_MASK[VALID_POSITIONS] = 1
+
 
 class Position(IntEnum):
-    Invalid = -1
-    Empty = 0
-    Player1 = 1
-    Player2 = 2
+    """
+    Represents the state of a single cell on the board.
+    """
+
+    Invalid = -1  # Off-board cell
+    Empty = 0  # Empty valid cell
+    Player1 = 1  # Occupied by Player 1
+    Player2 = 2  # Occupied by Player 2
 
     @classmethod
     def with_player(cls, player: Player) -> "Position":
@@ -127,7 +190,8 @@ class Position(IntEnum):
                 return f"{Player.Player2} "
 
 
-# Movement of a piece on the board represented by a pair of board indices
+# Movement of a piece on the board represented by a pair of board indices (Start, End)
+# Array of shape (2, 2) where [0] is start position and [1] is end position.
 # Array of shape (2, 2)
 type Movement = NDArray[np.int_]
 
@@ -135,16 +199,25 @@ type Movement = NDArray[np.int_]
 @final
 @dataclass
 class Board:
+    """
+    Represents the game board state.
+
+    The state is a 17x17 grid where valid positions form the star shape.
+    Values in the grid are integers mapping to `Position` enum.
+    """
+
     state: NDArray[np.int32]
 
     @classmethod
     def empty(cls) -> "Board":
+        """Creates an empty board with all valid positions set to Empty."""
         state = np.full((17, 17), Position.Invalid, dtype=np.int32)
         state[VALID_POSITIONS] = Position.Empty
         return cls(state=state)
 
     @classmethod
     def two_players(cls) -> "Board":
+        """Creates a standard starting board for a 2-player game."""
         board = cls.empty()
         board.state[PLAYER1_STARTING_POSITIONS] = Position.Player1
         board.state[PLAYER2_STARTING_POSITIONS] = Position.Player2
@@ -157,16 +230,39 @@ class Board:
         self.state[tuple(idx)] = position
 
     def apply_movement(self, movement: Movement) -> None:
+        """
+        Applies a movement to the board state in-place.
+
+        Args:
+            movement: A (2, 2) array where [0] is start index and [1] is end index.
+        """
         self[movement[1]] = self[movement[0]]
         self[movement[0]] = Position.Empty
 
     def to_string(self) -> str:
+        """Returns a string representation of the board for debugging."""
         return "\n".join(
             map(
                 lambda e: " " * e[0] + "".join(map(lambda x: str(Position(x)), e[1])),
                 enumerate(self.state),
             )
         )
+
+    def to_tensor(self) -> T.Tensor:
+        """
+        Converts the board state to a PyTorch tensor for neural network input.
+
+        Returns:
+            A tensor of shape (3, 17, 17):
+            - Channel 0: 1 where Player 1 has a piece, 0 otherwise
+            - Channel 1: 1 where Player 2 has a piece, 0 otherwise
+            - Channel 2: Mask of valid board positions (1 for valid, 0 for invalid)
+        """
+        tensor = np.zeros((3, 17, 17), dtype=np.float32)
+        tensor[0] = self.state == Position.Player1
+        tensor[1] = self.state == Position.Player2
+        tensor[2] = BOARD_MASK
+        return T.tensor(tensor)
 
 
 # Scores of each player
@@ -175,6 +271,10 @@ type Scores = tuple[int, int]
 
 @dataclass(frozen=True)
 class GameResult:
+    """
+    Data class representing the result of a completed game.
+    """
+
     winner: Player
     total_turns: int
     scores: Scores
