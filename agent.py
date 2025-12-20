@@ -18,7 +18,6 @@ from client import (
 
 from sternhalma import (
     Board,
-    Movement,
     Player,
 )
 
@@ -52,8 +51,8 @@ class Agent(ABC):
                     logging.error("Disconnection signal received mid game")
                     raise ConnectionAbortedError
 
-                case ServerMessage():
-                    pass
+                case ServerMessage() as unhandled:
+                    logging.warning(f"Unhandled server message: {unhandled}")
 
     def prepare_training(self):
         self.nn: None = None
