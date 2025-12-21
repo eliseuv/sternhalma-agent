@@ -163,15 +163,15 @@ class Client:
 
         logging.debug("Message successfully sent")
 
-    async def assign_player(self) -> Player:
+    async def handshake(self) -> Player:
         # Wait for Welcome message first
         message = await self.receive_message()
         match message:
-            case ServerMessageWelcome(session_id, player):
+            case ServerMessageWelcome(session_id):
                 logging.info(
-                    f"Welcome! Session ID: {session_id}, Assigned player: {player}"
+                    f"Welcome! Session ID: {session_id}, Assigned player: {Player.Player1}"
                 )
-                return player
+                return Player.Player1
 
             case ServerMessageReject(reason):
                 logging.error(f"Connection rejected: {reason}")

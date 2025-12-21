@@ -72,10 +72,10 @@ async def main():
     # Connect to server
     async with Client(host, port) as client:
         # Wait for player assignment from server
-        player = await client.assign_player()
+        _ = await client.handshake()
 
         # Create agent
-        agent = AgentBrownian(player)
+        agent = AgentBrownian()
 
         # Is the agent training or playing?
         if training_mode:
