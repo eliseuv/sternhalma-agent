@@ -7,51 +7,38 @@ import torch.nn.functional as F
 from sternhalma import Board, Position
 
 
-def from_state(board: Board, current_player: int, device: str = "cuda") -> T.Tensor:
+def from_state(board: Board, device: str = "cuda") -> T.Tensor:
     """
     Converts the board state to a canonical tensor representation for neural network input.
 
-    The representation is always relative to the `current_player`. This allows the network
-    to learn a single policy for "friendly" vs "enemy" pieces regardless of which player it is.
+    The input `board` is always from the perspective of the current player (Player 1).
+    This means the current player's pieces are at the bottom (Player 1's starting position)
+    and the opponent's pieces are at the top (Player 2's starting position).
 
-    - If `current_player` is Player 1: No rotation.
-    - If `current_player` is Player 2: The board is rotated 180 degrees so that Player 2
-      appears to be playing from the same perspective as Player 1 (e.g. bottom to top).
+    - Channel 0: Binary mask for "friendly" pieces (always Player 1).
+    - Channel 1: Binary mask for "enemy" pieces (always Player 2).
+    - Channel 2: Binary mask for all valid board positions (board geometry).
 
     Args:
-        board: The current board state.
-        current_player: The player whose perspective the board should be viewed from (1 or 2).
+        board: The current board state (in relative coordinates).
         device: The device (e.g., "cpu", "cuda") where the tensor will be allocated.
 
     Returns:
-        A tensor of shape (1, 3, 17, 17) ready for the network:
-        - Channel 0: Binary mask for "friendly" pieces (current_player).
-        - Channel 1: Binary mask for "enemy" pieces (opponent).
-        - Channel 2: Binary mask for all valid board positions (board geometry).
+        A tensor of shape (1, 3, 17, 17) ready for the network.
     """
     tensor = np.zeros((3, 17, 17), dtype=np.float32)
 
-    # Determine masks based on perspective
-    # Channel 0 is always "me", Channel 1 is always "opponent"
-    if current_player == 1:
-        friend_mask = board.state == Position.Player1
-        enemy_mask = board.state == Position.Player2
-        should_rotate = False  # Player 1 plays in default orientation
-    else:
-        friend_mask = board.state == Position.Player2
-        enemy_mask = board.state == Position.Player1
-        should_rotate = True  # Player 2 board is rotated to match P1 perspective
+    # Determine masks based on player identity
+    # Channel 0 is always "me" (Player 1), Channel 1 is always "opponent" (Player 2)
+    # The board is assumed to be in relative coordinates where "me" == Player 1.
+    friend_mask = board.state == Position.Player1
+    enemy_mask = board.state == Position.Player2
 
     # Set masks for each channel
     tensor[0] = friend_mask.astype(np.float32)
     tensor[1] = enemy_mask.astype(np.float32)
     # Channel 2 is invariant (just valid positions)
     tensor[2] = (board.state != Position.Invalid).astype(np.float32)
-
-    # Apply 180-degree rotation for Player 2 to canonicalize the board state
-    # This effectively swaps the start/target triangles relative to the grid center
-    if should_rotate:
-        tensor = np.rot90(tensor, k=2, axes=(1, 2))
 
     # Convert to torch tensor, add batch dimension (N=1), and move to device
     return T.from_numpy(tensor.copy()).unsqueeze(0).to(device)
