@@ -18,14 +18,11 @@ from protocol import (
 
 from sternhalma import (
     Board,
-    Player,
 )
 
 
 class Agent(ABC):
-    def __init__(self, player: Player):
-        # Player assigned to agent
-        self.player: Player = player
+    def __init__(self):
         # Board state
         self.board: Board = Board.two_players()
 
@@ -79,9 +76,9 @@ class AgentBrownian(Agent):
 @final
 class AgentDQN(Agent):
     @override
-    def __init__(self, player: Player):
+    def __init__(self):
         # Parent constructor
-        super().__init__(player)
+        super().__init__()
 
         # Neural network
         self.nn = None

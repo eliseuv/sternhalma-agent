@@ -51,7 +51,6 @@ class TestClientIntegration(unittest.IsolatedAsyncioTestCase):
             welcome = {
                 "type": "welcome",
                 "session_id": "test-session",
-                "player": "player1",
             }
             self._send(writer, welcome)
             await self.server_msgs.put(("sent", welcome))
@@ -116,7 +115,7 @@ class TestClientIntegration(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(msg["type"], "welcome")
 
             # 2. Assign Player
-            player = await client.assign_player()
+            player = await client.handshake()
             self.assertEqual(player, Player.Player1)
 
             # 3. Game Loop (Turn -> Choice)

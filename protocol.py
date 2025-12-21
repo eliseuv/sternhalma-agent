@@ -89,10 +89,6 @@ class ServerMessage(ABC):
             case "reject":
                 return ServerMessageReject.parse(message)
 
-            # Player assignment message
-            case "assign":
-                return ServerMessageAssign.parse(message)
-
             # Disconnection request
             case "disconnect":
                 return ServerMessageDisconnect.parse(message)
@@ -111,23 +107,6 @@ class ServerMessage(ABC):
 
             case _:
                 raise ValueError(f"Unexpected message type: {message.get('type')}")
-
-
-@final
-@dataclass(frozen=True)
-class ServerMessageAssign(ServerMessage):
-    """Server assigns a player to client
-
-    Attributes:
-        player: Player the client was assign
-    """
-
-    player: Player
-
-    @override
-    @classmethod
-    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
-        return cls(player=Player.from_str(message["player"]))
 
 
 @final
@@ -185,22 +164,19 @@ class ServerMessageMovement(ServerMessage):
 @final
 @dataclass(frozen=True)
 class ServerMessageWelcome(ServerMessage):
-    """Server welcomes the client and assigns a session ID and player
+    """Server welcomes the client and assigns a session ID
 
     Attributes:
         session_id: Unique session identifier
-        player: Player assigned to the client
     """
 
     session_id: str
-    player: Player
 
     @override
     @classmethod
     def parse(cls, message: dict[str, Any]) -> "ServerMessage":
         return cls(
             session_id=message["session_id"],
-            player=Player.from_str(message["player"]),
         )
 
 
