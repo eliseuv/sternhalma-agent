@@ -53,7 +53,6 @@ uv run main.py --host 127.0.0.1 --port 8080
 - `client.py`: Async TCP client for connecting to the game server.
 - `protocol.py`: Protocol message definitions (Server/Client messages).
 - `agent.py`: Abstract agent definition and basic implementations (Random, Constant).
-- `network.py`: Networking utilities (potentially deprecated/merged).
 
 ## Current Progress
 
