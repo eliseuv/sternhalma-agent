@@ -10,4 +10,9 @@ wheels/
 .venv
 
 # Direnv
+.envrc
 .direnv/
+
+# Cached files
+.pytest_cache/
+.ruff_cache/
