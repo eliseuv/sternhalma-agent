@@ -6,13 +6,13 @@ import logging
 from typing import Any, final
 
 
-from sternhalma import Player
 from utils import printer
 
 
 from protocol import (
     ClientMessage,
     ClientMessageHello,
+    ClientMessageReconnect,
     ServerMessage,
     ServerMessageReject,
     ServerMessageWelcome,
@@ -55,6 +55,8 @@ class Client:
         self.reader: asyncio.StreamReader | None = None
         self.writer: asyncio.StreamWriter | None = None
 
+        self.session_id: str | None = None
+
     async def __aenter__(self):
         """Enter the async context manager"""
 
@@ -67,7 +69,13 @@ class Client:
                 logging.info("Connection established successfully")
 
                 # Send Hello immediately after connection
-                await self.send_message(ClientMessageHello())
+                if self.session_id:
+                    logging.info(
+                        f"Attempting to reconnect with session ID: {self.session_id}"
+                    )
+                    await self.send_message(ClientMessageReconnect(self.session_id))
+                else:
+                    await self.send_message(ClientMessageHello())
 
                 return self
 
@@ -186,32 +194,25 @@ class Client:
 
         logging.debug("Message successfully sent")
 
-    async def handshake(self) -> Player:
-        """Perform the handshake with the server
+    async def handshake(self):
+        """Perform the handshake with the server"""
 
-        Returns:
-            Player: The player assigned by the server
-        """
-
-        # Wait for Welcome message first
+        # Wait for "Welcome" message first
         message = await self.receive_message()
         match message:
             case ServerMessageWelcome(session_id):
-                logging.info(
-                    f"Welcome! Session ID: {session_id}, Assigned player: {Player.Player1}"
-                )
-                return Player.Player1
+                # The server accepts the connection and assigns a session ID
+                logging.info(f"Welcome! Session ID: {session_id}")
+                self.session_id = session_id
+                return
 
             case ServerMessageReject(reason):
+                # The server rejects the connection
                 logging.error(f"Connection rejected: {reason}")
+                self.session_id = None
                 raise ConnectionRefusedError(f"Server rejected connection: {reason}")
 
             case _:
-                # If we get an Assign message, it might be a reconnect scenario or protocol slight variation,
-                # but per spec Hello -> Welcome. Let's handle Assign if it comes instead/after.
-                # Actually, spec says Welcome has player.
-                if logging.getLogger().isEnabledFor(logging.ERROR):
-                    logging.error(
-                        f"Expected Welcome message, got: {printer.pformat(message)}"
-                    )
+                # In case of an unexpected message, log it and raise an error
+                logging.error(f"Expected Welcome message, got: {message}")
                 raise ValueError(f"Unexpected message during handshake: {message}")

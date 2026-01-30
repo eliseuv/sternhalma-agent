@@ -36,7 +36,7 @@ _ = parser.add_argument(
     default=8080,
     help="Game server port",
 )
-# Agent mode
+# Training mode
 _ = parser.add_argument(
     "--train",
     action="store_true",
@@ -69,10 +69,10 @@ async def main():
     port = int(args.port)
     training_mode = bool(args.training_mode)
 
-    # Connect to server
+    # Spawn client
     async with Client(host, port) as client:
         # Wait for player assignment from server
-        _ = await client.handshake()
+        await client.handshake()
 
         # Create agent
         agent = AgentBrownian()

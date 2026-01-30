@@ -24,16 +24,6 @@ class Player(IntEnum):
     Player1 = 1
     Player2 = 2
 
-    @classmethod
-    def from_str(cls, player_str: str) -> "Player":
-        match player_str:
-            case "player1":
-                return Player.Player1
-            case "player2":
-                return Player.Player2
-            case _:
-                raise ValueError(f"Unknown player string: {player_str}")
-
     @override
     def __str__(self) -> str:
         match self:
@@ -46,7 +36,6 @@ class Player(IntEnum):
 # Axial index in the hexagonal board
 # The board uses a 2D coordinate system (q, r) where q is the column and r is the row (or derived axis).
 # Array of shape (2,) representing [q, r]
-# See https://www.redblobgames.com/grids/hexagons/ for hexagonal grid coordinate systems.
 type BoardIndex = NDArray[np.int_]
 
 

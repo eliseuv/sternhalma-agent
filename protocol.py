@@ -68,7 +68,7 @@ class GameResultFinished(GameResult):
     @classmethod
     def parse(cls, result: dict[str, Any]) -> "GameResult":
         return cls(
-            winner=Player.from_str(result["winner"]),
+            winner=Player(result["winner"]),
             total_turns=result["total_turns"],
             scores=result["scores"],
         )
@@ -107,6 +107,42 @@ class ServerMessage(ABC):
 
             case _:
                 raise ValueError(f"Unexpected message type: {message.get('type')}")
+
+
+@final
+@dataclass(frozen=True)
+class ServerMessageWelcome(ServerMessage):
+    """Server accepts the connection from the client and assigns a session ID
+
+    Attributes:
+        session_id: Unique session identifier
+    """
+
+    session_id: str
+
+    @override
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        return cls(
+            session_id=message["session_id"],
+        )
+
+
+@final
+@dataclass(frozen=True)
+class ServerMessageReject(ServerMessage):
+    """Server rejects the connection from the client
+
+    Attributes:
+        reason: Reason for rejection
+    """
+
+    reason: str
+
+    @override
+    @classmethod
+    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
+        return cls(reason=message["reason"])
 
 
 @final
@@ -155,46 +191,10 @@ class ServerMessageMovement(ServerMessage):
     @classmethod
     def parse(cls, message: dict[str, Any]) -> "ServerMessage":
         return cls(
-            player=Player.from_str(message["player"]),
+            player=Player(message["player"]),
             movement=np.array(message["movement"]),
             scores=message["scores"],
         )
-
-
-@final
-@dataclass(frozen=True)
-class ServerMessageWelcome(ServerMessage):
-    """Server welcomes the client and assigns a session ID
-
-    Attributes:
-        session_id: Unique session identifier
-    """
-
-    session_id: str
-
-    @override
-    @classmethod
-    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
-        return cls(
-            session_id=message["session_id"],
-        )
-
-
-@final
-@dataclass(frozen=True)
-class ServerMessageReject(ServerMessage):
-    """Server rejects the connection
-
-    Attributes:
-        reason: Reason for rejection
-    """
-
-    reason: str
-
-    @override
-    @classmethod
-    def parse(cls, message: dict[str, Any]) -> "ServerMessage":
-        return cls(reason=message["reason"])
 
 
 @final

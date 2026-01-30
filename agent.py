@@ -1,5 +1,5 @@
-from abc import ABC, abstractmethod
 import logging
+from abc import ABC, abstractmethod
 from typing import final, override
 
 import numpy as np
