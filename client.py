@@ -21,15 +21,27 @@ from protocol import (
 
 @final
 class Client:
+    """Async TCP client for connecting to the game server"""
+
     def __init__(
         self,
         host: str = "127.0.0.1",
         port: int = 8080,
-        timeout: int = 30,
+        timeout: int = 30,  # 30s
         delay: float = 0.500,  # 500ms
         attempts: int = 20,
         buf_size: int = 1024,
     ):
+        """Connect to the game server.
+
+        Args:
+            host (str): Server host.
+            port (int): Server port.
+            timeout (int): Connection timeout.
+            delay (float): Connection retry delay.
+            attempts (int): Number of connection attempts.
+        """
+
         # Socket connection parameters
         self.host = host
         self.port = port
@@ -45,6 +57,8 @@ class Client:
         self.writer: asyncio.StreamWriter | None = None
 
     async def __aenter__(self):
+        """Enter the async context manager"""
+
         logging.info(f"Connecting to server at {self.host}:{self.port}")
         for attempt in range(self.attempts):
             try:
@@ -77,6 +91,8 @@ class Client:
             )
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):  # pyright: ignore [reportMissingParameterType, reportUnknownParameterType]
+        """Exit the async context manager"""
+
         if self.writer:
             self.writer.close()
             await self.writer.wait_closed()
@@ -90,6 +106,8 @@ class Client:
         return False
 
     async def receive_message(self) -> ServerMessage:
+        """Receive a message from the server"""
+
         logging.debug("Waiting for server...")
 
         if self.reader is None:
@@ -135,6 +153,12 @@ class Client:
         return message
 
     async def send_message(self, message: ClientMessage):
+        """Send a message to the server
+
+        Args:
+            message (ClientMessage): The message to send
+        """
+
         if self.writer is None:
             raise ConnectionError("Client not connected")
 
@@ -164,6 +188,12 @@ class Client:
         logging.debug("Message successfully sent")
 
     async def handshake(self) -> Player:
+        """Perform the handshake with the server
+
+        Returns:
+            Player: The player assigned by the server
+        """
+
         # Wait for Welcome message first
         message = await self.receive_message()
         match message:
