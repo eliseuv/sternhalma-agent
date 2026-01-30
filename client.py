@@ -30,7 +30,6 @@ class Client:
         timeout: int = 30,  # 30s
         delay: float = 0.500,  # 500ms
         attempts: int = 20,
-        buf_size: int = 1024,
     ):
         """Connect to the game server.
 
