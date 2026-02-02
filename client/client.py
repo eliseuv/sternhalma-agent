@@ -9,7 +9,7 @@ from typing import Any, final
 from utils import printer
 
 
-from protocol import (
+from .protocol import (
     ClientMessage,
     ClientMessageHello,
     ClientMessageReconnect,

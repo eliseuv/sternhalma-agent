@@ -3,8 +3,8 @@ import asyncio
 import struct
 import cbor2
 import logging
-from client import Client
-from protocol import (
+from client.client import Client
+from client.protocol import (
     ClientMessageChoice,
     ServerMessageTurn,
     ServerMessageGameFinished,

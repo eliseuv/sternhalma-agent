@@ -102,7 +102,7 @@ def euclidean_distance(i: BoardIndex, j: BoardIndex) -> np.float64:
 # Valid positions on the board
 # Defined as hardcoded axial coordinates for the standard Sternhalma star-shaped board.
 # Stored as tuple of 2 arrays (q_indices, r_indices) for easy indexing.
-VALID_POSITIONS: tuple[NDArray[np.int_], NDArray[np.int_]] = tuple(np.transpose([
+VALID_POSITIONS: tuple[BoardIndex, BoardIndex] = tuple(np.transpose([
                                            [0,12],
                                        [1,11],[1,12],
                                     [2,10],[2,11],[2,12],
@@ -148,9 +148,7 @@ BOARD_MASK[VALID_POSITIONS] = 1
 
 
 class Position(IntEnum):
-    """
-    Represents the state of a single cell on the board.
-    """
+    """Represents the state of a single cell on the board"""
 
     Invalid = -1  # Off-board cell
     Empty = 0  # Empty valid cell
@@ -199,6 +197,7 @@ class Board:
     @classmethod
     def empty(cls) -> "Board":
         """Creates an empty board with all valid positions set to Empty."""
+
         state = np.full((17, 17), Position.Invalid, dtype=np.int32)
         state[VALID_POSITIONS] = Position.Empty
         return cls(state=state)
@@ -206,6 +205,7 @@ class Board:
     @classmethod
     def two_players(cls) -> "Board":
         """Creates a standard starting board for a 2-player game."""
+
         board = cls.empty()
         board.state[PLAYER1_STARTING_POSITIONS] = Position.Player1
         board.state[PLAYER2_STARTING_POSITIONS] = Position.Player2
@@ -243,9 +243,7 @@ type Scores = tuple[int, int]
 
 @dataclass(frozen=True)
 class GameResult:
-    """
-    Data class representing the result of a completed game.
-    """
+    """Data class representing the result of a completed game"""
 
     winner: Player
     total_turns: int
